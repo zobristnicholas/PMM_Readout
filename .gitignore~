@@ -99,7 +99,3 @@ ENV/
 
 # mypy
 .mypy_cache/
-
-#extra files
-extra*
-python_code/test_*
