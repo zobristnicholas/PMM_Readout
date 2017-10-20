@@ -101,5 +101,6 @@ ENV/
 .mypy_cache/
 
 #extra files
+*~
 extra*
 *test*
