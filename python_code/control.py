@@ -1,6 +1,7 @@
-from time import sleep
 import numpy as np
 from arduino import Arduino
+from time import sleep
+from scipy.interpolate import interp1d
 
 
 class Control(Arduino):
@@ -12,9 +13,8 @@ class Control(Arduino):
         self.rows = 10
         self.columns = 10
 
-        # define resistor values and max voltage for DAC output
+        # define resistor values in np array
         self.R_row = 356 * np.ones(10)
-        self.max_voltage = 5.0
 
         # pins for enabling row and column switches
         self.row_pins = [32, 33, 36, 37, 40, 41, 44, 45, 48, 49]
@@ -26,8 +26,13 @@ class Control(Arduino):
 
         # initialize Arduino
         Arduino.__init__(self, port, baud_rate=baud_rate)
+
         # define output pins
         self.output(self.enable_pins)
+
+        # calibrate max voltage for DAC output
+        sleep(0.5)  # let Vcc equilibriate
+        self.__calibrateMaxVoltage()
 
     def __str__(self):
         # add digital readout info later
@@ -80,29 +85,29 @@ class Control(Arduino):
         # get required voltage
         voltage = self.__currentToVoltage(current)
 
-        # change enable pins if sign change is necessary
-        if (np.sign(voltage) == -1 and self.current_sign == 'positive') or \
-           (np.sign(voltage) == 1 and self.current_sign == 'negative'):
-            self.__changeSign()
-
-        # set voltage on DAC
-        binary = int(np.abs(voltage) * (2**16 - 1) / self.max_voltage)
-        if binary > 2**16 - 1:
-            max_current = round(self.max_voltage / self.R_row[self.current_row], 4)
-            raise ValueError('The maximum current allowed for this row is ' +
+        if np.abs(voltage) > self.max_voltage[self.current_row]:
+            max_current = round(self.max_voltage[self.current_row] /
+                                self.R_row[self.current_row], 4)
+            raise ValueError('The maximum current allowed on this row is ' +
                              str(max_current)[:5] + ' A')
-        self.writeDAC(binary)
+
+        self.setVoltage(voltage)
 
         return True
 
     def setVoltage(self, voltage):
         '''
-        Sets a voltage by selecting an appropriate binary number for the DAC. The current
+        Sets a DAC voltage by selecting an appropriate binary number. The current
         flows through whichever magnet has been enabled by running selectMagnet first.
+        Depending on the sign of the voltage, this is not necessarily the voltage accross
+        the device.
         '''
         if not hasattr(self, 'current_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
+        if np.abs(voltage) > self.max_voltage[self.current_row]:
+            raise ValueError('The maximum voltage output on this row is ' +
+                             str(self.max_voltage[self.current_row]) + ' V')
 
         # change enable pins if sign change is necessary
         if (np.sign(voltage) == -1 and self.current_sign == 'positive') or \
@@ -110,20 +115,17 @@ class Control(Arduino):
             self.__changeSign()
 
         # set voltage on DAC
-        binary = int(np.abs(voltage) * (2**16 - 1) / self.max_voltage)
-        if binary > 2**16 - 1:
-            raise ValueError('The maximum voltage allowed is ' +
-                             str(self.max_voltage) + ' V')
+        binary = int(self.linearity_correction[self.current_row](np.abs(voltage))
+                     * 2**16 / self.Vcc)
         self.writeDAC(binary)
 
         return True
 
-    def resetMagnet(self, row, column, time_step):
+    def resetMagnet(self, row, column):
         '''
         Removes the magnetization in the magnet in (row, column) by oscillating an
-        exponentially decaying current. time_step sets the time to wait before setting
-        the next current in the predefined current_list. Magnet selection returned to
-        previous state after running. DAC remains off.
+        exponentially decaying current. Magnet selection returned to previous state after
+        running. DAC gets set to zero.
         '''
         # record current state so that we can reinitialize after resetting requested
         # magnet
@@ -135,12 +137,14 @@ class Control(Arduino):
         self.selectMagnet(row, column)
 
         # set oscillating and exponentially decaying current through (row, column) magnet
-        tt = np.arange(0, 100)
-        voltage_list = np.exp(-tt / 20.0) * np.cos(tt) * self.max_voltage
-        voltage_list = np.append(voltage_list, 0)
-        for voltage in voltage_list:
-            self.setVoltage(voltage)
-            sleep(time_step)
+        tt = np.arange(0, 70)
+        max_current = round(self.max_voltage[self.current_row] /
+                            self.R_row[self.current_row], 4)
+        current_list = np.exp(-tt / 20.0) * np.cos(tt / 3.0) * max_current
+        current_list = np.append(current_list, 0)
+        for current in current_list:
+            self.setCurrent(current)
+            sleep(0.1)
 
         # reselect old magnet
         self.selectMagnet(old_row, old_column, sign=old_sign)
@@ -196,6 +200,8 @@ class Control(Arduino):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
 
+        return True
+
     def __currentToVoltage(self, current):
         '''
         Converts the requested current into a voltage required to be output by the DAC.
@@ -206,10 +212,50 @@ class Control(Arduino):
 
         return voltage
 
-    def __calibrateMaxVoltage(self):
+    def __calibrateDACVoltage(self):
         '''
-        Reads the maximum voltage availible from the DAC and sets the self.max_voltage
-        variable. This value can vary depending on the voltage recieved via USB to the
-        Arduino.
+        Measures the DAC nonlinearity and generates a 'linearity_correction' function for
+        each row. This function compensates for the two main sources of nonlinearity:
+        voltage errors and current draw errors. Needs to be run in the __init__()
+        statement and assumes DAC is on, so run it after 'self.output()'.
         '''
-        raise NotImplementedError
+        # ensure all switches are off
+        for pin in self.enable_pins:
+            self.setLow(pin)
+
+        # read the voltage powering arduino to appropriately rescale results
+        self.Vcc = self.readVcc()
+
+        # write values to the DAC and read the result with the Arduino
+        binary_list = np.arange(0, 2**16 + 3854, 3855)
+        voltage_list = np.zeros(np.size(binary_list))
+        for index, value in enumerate(binary_list):
+            self.writeDAC(value)
+            sleep(0.1)
+            voltage_list[index] = self.readDAC()
+        # return DAC to zero Volts
+        self.writeDAC(0)
+
+        # modify the read voltages to take into account DAC current nonlinearity
+        poly = [5.03514759e+19, -2.77472015e+18, 6.27230841e+16, -7.51573164e+14,
+                5.14163336e+12, -2.01184144e+10, 4.26235161e+07, -4.46109983e+04,
+                1.65115877e+01, 0.0]
+        current_correction = lambda x: np.polyval(poly, x)
+        real_voltages = [voltage_list + current_correction(voltage_list / R)
+                         for R in self.R_row]
+
+        # change the numbers sent to the DAC to target voltages
+        target_voltages = binary_list * self.Vcc / 2**16
+
+        # create a list of linearity corrections, one for each row
+        self.linearity_correction = []
+        for index, _ in enumerate(self.R_row):
+            self.linearity_correction.append(interp1d(real_voltages[index],
+                                                      target_voltages, kind='linear'))
+
+        # record the max voltage for each row
+        self.max_voltage = []
+        for voltages in real_voltages:
+            self.max_voltage.append(voltages[-1])
+
+        return True

@@ -1,5 +1,6 @@
 import serial
 from time import sleep
+from numpy import mean
 
 
 class Arduino(object):
@@ -22,8 +23,12 @@ class Arduino(object):
         self.serial = serial.Serial(port, baud_rate)
         self.serial.write(b'99')
 
-        # define DAC power pin
+        # define DAC power pin and output read pin
         self.__DAC_PIN_POWER = 13
+        self.__DAC_PIN_OUTPUT = 0  # A0
+
+        # initialize Vcc to 5V. A more accurate value can be found by calling readVcc
+        self.Vcc = 5.0
 
     def __str__(self):
         return "Arduino is on port %s at %d baudrate" % (self.serial.port,
@@ -83,7 +88,7 @@ class Arduino(object):
         '''
         self.__sendData('4')
         self.__sendData(pin)
-        return self.__formatPinState(self.__getData()[0])
+        return self.__formatPinState(self.__getData())
 
     def analogWrite(self, pin, value):
         '''
@@ -101,7 +106,7 @@ class Arduino(object):
         '''
         self.__sendData('6')
         self.__sendData(pin)
-        return self.__getData()
+        return int(self.__getData())
 
     def writeDAC(self, value):
         '''
@@ -111,17 +116,43 @@ class Arduino(object):
         if (not isinstance(value, int)) or value < 0 or value > 2**16 - 1:
             raise ValueError('value must be an integer in [0, 65535]')
 
+        # parse hexidecimal into to two parts
         if value < 256:
             data0 = 0
             data1 = value
+        elif value < 4096:
+            data0 = int(hex(value)[2], 16)
+            data1 = int(hex(value)[3:5], 16)
         else:
             data0 = int(hex(value)[2:4], 16)
-            data1 = int(hex(value)[4:], 16)
+            data1 = int(hex(value)[4:6], 16)
 
         self.__sendData('7')
         self.__sendData(data0)
         self.__sendData(data1)
         return True
+
+    def readDAC(self):
+        '''
+        Reads the output value of the AD 5667 DAC (controleverything.com) from
+        __DAC_PIN_OUTPUT. Returns a value between 0 and 5V and assumes that the default
+        voltage range has not been changed with 'analogReference()' in serial_control.ino.
+        '''
+        return self.analogRead(self.__DAC_PIN_OUTPUT) * self.Vcc / 1024
+
+    def readVcc(self):
+        '''
+        Reads the voltage powering the Arduino by measuring the 1.1 V on board reference
+        voltage. Used to calibrate the max voltage that 'analogRead()' recieves from the
+        board.
+        '''
+        # read multiple times and average
+        Vcc = []
+        for index in range(10):
+            self.__sendData('8')
+            Vcc.append(float(self.__getData()) / 1000.0)
+            sleep(0.1)
+        return mean(Vcc)
 
     def turnOnDAC(self):
         '''
@@ -187,7 +218,7 @@ class Arduino(object):
         '''
         input_string = self.serial.readline()
         input_string = input_string.decode('utf-8')
-        return input_string.rstrip('\n')
+        return input_string.rstrip('\n').rstrip('\r')
 
     def __formatPinState(self, pinValue):
         '''

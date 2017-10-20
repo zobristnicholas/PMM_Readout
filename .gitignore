@@ -102,4 +102,4 @@ ENV/
 
 #extra files
 extra*
-python_code/test_*
+*test*
