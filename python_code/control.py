@@ -32,7 +32,7 @@ class Control(Arduino):
 
         # calibrate max voltage for DAC output
         sleep(0.5)  # let Vcc equilibriate
-        self.__calibrateMaxVoltage()
+        self.__calibrateDACVoltage()
 
     def __str__(self):
         # add digital readout info later
