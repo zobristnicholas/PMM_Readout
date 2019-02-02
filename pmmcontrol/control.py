@@ -1,5 +1,5 @@
 import numpy as np
-from arduino import Arduino
+from pmmcontrol.arduino import Arduino
 from time import sleep
 from scipy.interpolate import interp1d
 
