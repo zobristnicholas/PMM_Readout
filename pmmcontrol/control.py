@@ -8,21 +8,26 @@ class Control(Arduino):
     '''
     Class for controlling the PMM readout. Built on the Arduino class from arduino.py
     '''
-    def __init__(self, port, baud_rate=115200):
+    def __init__(self, port, baud_rate=115200, self_test=False):
         # define number of rows and columns
         self.rows = 10
         self.columns = 10
 
         # define resistor values in np array
         self.R_row = 356 * np.ones(10)
+        # value of current sense resistor
+        self.R_sense = 1
 
         # pins for enabling row and column switches
         self.row_pins = [32, 33, 36, 37, 40, 41, 44, 45, 48, 49]
         self.column_pins = [34, 35, 38, 39, 42, 43, 46, 47, 50, 51]
         # pins for enabling positive or negative current
         self.sign_pins = {'positive': 52, 'negative': 53}
-        # all pins enabled for use
-        self.enable_pins = self.row_pins + self.column_pins + self.sign_pins.values()
+        # all output pins enabled for use
+        self.enable_pins = self.row_pins + self.column_pins + list(self.sign_pins.values())
+
+        # analog pin for current sense
+        self.sense_pin = 1
 
         # initialize Arduino
         Arduino.__init__(self, port, baud_rate=baud_rate)
@@ -32,7 +37,12 @@ class Control(Arduino):
 
         # calibrate max voltage for DAC output
         sleep(0.5)  # let Vcc equilibriate
-        self.__calibrateDACVoltage()
+
+        # ENABLE IF DAC ATTACHED
+        #self.__calibrateDACVoltage()
+
+        if self_test:
+            pass
 
     def __str__(self):
         # add digital readout info later
@@ -120,6 +130,16 @@ class Control(Arduino):
         self.writeDAC(binary)
 
         return True
+
+    def readTotalCurrent(self):
+
+        #sense_voltage = self.analogRead(self.sense_pin)
+        sense_voltage = 5
+
+        # differential voltage across current sense IC with gain of 50 and offset of 2.5V
+        diff_voltage = (sense_voltage - 2.5) / 50
+
+        return diff_voltage / self.R_sense
 
     def resetMagnet(self, row, column):
         '''
