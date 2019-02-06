@@ -49,6 +49,13 @@ class Control(Arduino):
         return "Arduino is on port %s at %d baudrate" % (self.serial.port,
                                                          self.serial.baudrate)
 
+    def testConfig(self):
+        # test each magnet high
+
+        # test each magnet low
+
+        return True
+
     def selectMagnet(self, row, column, sign='positive'):
         '''
         Selects the magnet in (row,column) by setting the row and column switch to enable
@@ -133,8 +140,7 @@ class Control(Arduino):
 
     def readTotalCurrent(self):
 
-        #sense_voltage = self.analogRead(self.sense_pin)
-        sense_voltage = 5
+        sense_voltage = self.analogRead(self.sense_pin)
 
         # differential voltage across current sense IC with gain of 50 and offset of 2.5V
         diff_voltage = (sense_voltage - 2.5) / 50
