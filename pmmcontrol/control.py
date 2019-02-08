@@ -42,7 +42,7 @@ class Control(Arduino):
         #self.__calibrateDACVoltage()
 
         if self_test:
-            pass
+            self.testConfig()
 
     def __str__(self):
         # add digital readout info later
@@ -50,9 +50,44 @@ class Control(Arduino):
                                                          self.serial.baudrate)
 
     def testConfig(self):
-        # test each magnet high
+        '''
+        Performs a test of each row/column combination.
+        '''
+        # measure null current
+        print("Measuring null current")
+        self.null_current = self.readTotalCurrent()
 
-        # test each magnet low
+        # results of testing each magnet at vmax and vmin
+        self.high_test = np.zeros((self.rows, self.columns))
+        self.low_test = np.zeros((self.rows, self.columns))
+
+        # test each magnet high and low
+        for row in range(0, self.rows):
+            for col in range(0, self.columns):
+                # select magnet
+                print("Selecting magnet at coordinate {}, {}".format(row, col))
+                self.selectMagnet(row, col)
+
+                # set magnet high, low, then off
+                print("Setting voltage high")
+                self.setVoltage(5)
+                sleep(0.01)
+                print("Reading current")
+                self.high_test[row][col] = self.readTotalCurrent()
+
+                print("Setting voltage low")
+                self.setVoltage(-5)
+                sleep(0.01)
+                print("Reading total current")
+                self.low_test[row][col] = self.readTotalCurrent()
+
+                self.setVoltage(0)
+                sleep(0.01)
+
+        # for debugging purposes
+        print("Null current: ", self.null_current)
+        print("High test: ", self.high_test)
+        print("Low test: ", self.low_test)
 
         return True
 
