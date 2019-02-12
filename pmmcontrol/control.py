@@ -111,18 +111,6 @@ class Control(Arduino):
             raise ValueError("parameter 'column' must be an integer and between 0 and " +
                              str(self.columns - 1))
 
-        # disable all switches
-        for pin in self.enable_pins:
-            self.setLow(pin)
-
-        # set DAC to zero
-        self.writeDAC(0)
-
-        # enable switches (row, column)
-        self.setHigh(self.column_pins[column])
-        self.setHigh(self.row_pins[row])
-        self.setHigh(self.sign_pins[sign])
-
         # record state
         self.current_row = row
         self.current_column = column
@@ -130,14 +118,18 @@ class Control(Arduino):
 
         return True
 
-    def setCurrent(self, current):
+    def setCurrent(self, current, array=False):
         '''
         Sets a current by selecting an appropriate binary number for the DAC. The current
         flows through whichever magnet has been enabled by running selectMagnet first.
+        Calling this with array parameter False will disable all other switches. With array
+        parameter True, it will set all other magnets to minimum current in the opposite
+        direction.
         '''
         if not hasattr(self, 'current_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
+
         # get required voltage
         voltage = self.__currentToVoltage(current)
 
@@ -147,11 +139,11 @@ class Control(Arduino):
             raise ValueError('The maximum current allowed on this row is ' +
                              str(max_current)[:5] + ' A')
 
-        self.setVoltage(voltage)
+        self.setOneVoltage(voltage, array)
 
         return True
 
-    def setVoltage(self, voltage):
+    def setVoltage(self, voltage, array=False):
         '''
         Sets a DAC voltage by selecting an appropriate binary number. The current
         flows through whichever magnet has been enabled by running selectMagnet first.
@@ -165,10 +157,35 @@ class Control(Arduino):
             raise ValueError('The maximum voltage output on this row is ' +
                              str(self.max_voltage[self.current_row]) + ' V')
 
+        # disable all switches
+        for pin in self.enable_pins:
+            self.setLow(pin)
+
+        # set DAC to zero
+        self.writeDAC(0)
+
+        # enable switches (row, column)
+        if self.current_primary:
+            self.setHigh(self.column_pins_max[self.current_column])
+            self.setHigh(self.row_pins_max[self.current_row])
+        else:
+            self.setHigh(self.column_pins_min[self.current_column])
+            self.setHigh(self.row_pins_min[self.current_row])
+
+        self.setHigh(self.sign_pins[self.current_sign])
+
         # change enable pins if sign change is necessary
         if (np.sign(voltage) == -1 and self.current_sign == 'positive') or \
            (np.sign(voltage) == 1 and self.current_sign == 'negative'):
             self.__changeSign()
+
+        # if array parameter true, enable all rows except current row at low current
+        if array:
+            for row_pin_min, row_pin_max in zip(self.row_pins_min, self.row_pins_max):
+                if row_pin_min != self.row_pins_min[self.current_row]:
+                    self.setLow(row_pin_max)  # should already be set low from setOneCurrent() but
+                                              # for security we set one low every time we set the other high
+                    self.setHigh(row_pin_min)
 
         # set voltage on DAC
         binary = int(self.linearity_correction[self.current_row](np.abs(voltage))
