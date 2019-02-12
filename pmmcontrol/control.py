@@ -95,11 +95,12 @@ class Control(Arduino):
 
         return True
 
-    def selectMagnet(self, row, column, sign='positive'):
+    def selectMagnet(self, row, column, primary=True, sign='positive'):
         '''
         Selects the magnet in (row,column) by setting the row and column switch to enable
         in either the 'positive' or 'negative' configuration, and all of the other
-        switches to disable (open circuit).
+        switches to disable (open circuit). A magnet selected as primary will be
+        enabled with maximum current (small resistor).
         '''
         # check inputs
         if sign != 'positive' and sign != 'negative':
@@ -115,6 +116,7 @@ class Control(Arduino):
         self.current_row = row
         self.current_column = column
         self.current_sign = sign
+        self.current_primary = primary
 
         return True
 
@@ -129,6 +131,8 @@ class Control(Arduino):
         if not hasattr(self, 'current_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
+        if not self.current_primary and array:
+            raise ValueError("Can only set current in array mode if magnet has been selected as primary")
 
         # get required voltage
         voltage = self.__currentToVoltage(current)
@@ -153,6 +157,8 @@ class Control(Arduino):
         if not hasattr(self, 'current_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
+        if not self.current_primary and array:
+            raise ValueError("Can only set current in array mode if magnet has been selected as primary")
         if np.abs(voltage) > self.max_voltage[self.current_row]:
             raise ValueError('The maximum voltage output on this row is ' +
                              str(self.max_voltage[self.current_row]) + ' V')
@@ -164,7 +170,7 @@ class Control(Arduino):
         # set DAC to zero
         self.writeDAC(0)
 
-        # enable switches (row, column)
+        # enable switches (row, column) depending on whether the magnet is primary
         if self.current_primary:
             self.setHigh(self.column_pins_max[self.current_column])
             self.setHigh(self.row_pins_max[self.current_row])
