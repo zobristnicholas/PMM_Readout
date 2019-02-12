@@ -18,9 +18,13 @@ class Control(Arduino):
         # value of current sense resistor
         self.R_sense = 1
 
-        # pins for enabling row and column switches
-        self.row_pins = [32, 33, 36, 37, 40, 41, 44, 45, 48, 49]
-        self.column_pins = [34, 35, 38, 39, 42, 43, 46, 47, 50, 51]
+        # pins for enabling row and column switches at large current (small resistance)
+        self.row_pins_max = [32, 33, 36, 37, 40, 41, 44, 45, 48, 49]
+        self.column_pins_max = [34, 35, 38, 39, 42, 43, 46, 47, 50, 51]
+        # pins for enabling row and column switches at small current (large resistance)
+        self.row_pins_min = []
+        self.column_pins_min = []
+
         # pins for enabling positive or negative current
         self.sign_pins = {'positive': 52, 'negative': 53}
         # all output pins enabled for use
@@ -58,10 +62,10 @@ class Control(Arduino):
         self.null_current = self.readTotalCurrent()
 
         # results of testing each magnet at vmax and vmin
-        self.high_test = np.zeros((self.rows, self.columns))
-        self.low_test = np.zeros((self.rows, self.columns))
+        self.pos_test = np.zeros((self.rows, self.columns))
+        self.neg_test = np.zeros((self.rows, self.columns))
 
-        # test each magnet high and low
+        # test each magnet positive and negative
         for row in range(0, self.rows):
             for col in range(0, self.columns):
                 # select magnet
@@ -73,21 +77,21 @@ class Control(Arduino):
                 self.setVoltage(5)
                 sleep(0.01)
                 print("Reading current")
-                self.high_test[row][col] = self.readTotalCurrent()
+                self.pos_test[row][col] = self.readTotalCurrent()
 
                 print("Setting voltage low")
                 self.setVoltage(-5)
                 sleep(0.01)
                 print("Reading total current")
-                self.low_test[row][col] = self.readTotalCurrent()
+                self.neg_test[row][col] = self.readTotalCurrent()
 
                 self.setVoltage(0)
                 sleep(0.01)
 
         # for debugging purposes
         print("Null current: ", self.null_current)
-        print("High test: ", self.high_test)
-        print("Low test: ", self.low_test)
+        print("High test: ", self.pos_test)
+        print("Low test: ", self.neg_test)
 
         return True
 
