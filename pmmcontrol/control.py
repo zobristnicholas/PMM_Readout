@@ -125,6 +125,10 @@ class Control(Arduino):
         self.current_isPrimary = isPrimary
         self.current_isArrayMode = isArrayMode
 
+        # state values to be set later
+        self.current_posDAC = None
+        self.current_voltage = None
+
         return True
 
     def setCurrent(self, current):
@@ -219,12 +223,20 @@ class Control(Arduino):
         self.writeDAC(binary)
 
         self.current_posDAC = posDAC # keep track of sign of DAC
-        self.current_voltage = voltage
+        self.current_voltage = voltage # keep track of voltage
 
         return True
 
     def updateCurrent(self, current):
-        if not hasattr(self, 'current'):
+        '''
+        Updates the current of the currently selected magnet without resetting all the enables.
+        Essentially just updates the DAC but cares for the sign of the voltage.
+        '''
+
+        if not hasattr(self, 'current_sign'):
+            raise AttributeError("Some attributes have not been set. " +
+                                 " Run 'selectMagnet()' first")
+        if self.current_voltage == None:
             raise AttributeError("Initial current has not been set. " +
                                  " Run 'setCurrent()' first")
         if not self.current_isPrimary and self.isArrayMode:
@@ -249,7 +261,10 @@ class Control(Arduino):
         Essentially just updates the DAC but cares for the sign of the voltage.
         '''
 
-        if not hasattr(self, 'voltage'):
+        if not hasattr(self, 'current_sign'):
+            raise AttributeError("Some attributes have not been set. " +
+                                 " Run 'selectMagnet()' first")
+        if self.current_voltage == None:
             raise AttributeError("Initial voltage has not been set. " +
                                  " Run 'setVoltage()' first")
         if not self.current_isPrimary and self.isArrayMode:
@@ -298,6 +313,9 @@ class Control(Arduino):
         exponentially decaying current. DAC finishes at 0V.
         '''
 
+        if not hasattr(self, 'current_sign'):
+            raise AttributeError("Some attributes have not been set. " +
+                                 " Run 'selectMagnet()' first")
         if self.isArrayMode:
             raise ValueError("Can not reset magnet that has been selected in array mode. Please reselect magnet.")
 
