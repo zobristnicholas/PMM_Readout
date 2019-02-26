@@ -10,7 +10,7 @@ class Control(Arduino):
     '''
     def __init__(self, port, baud_rate=115200, self_test=False):
         # define number of rows and columns
-        self.rows = 10
+        self.rows = 9
         self.columns = 10
 
         # define resistor values in np array
@@ -19,11 +19,11 @@ class Control(Arduino):
         self.R_sense = 1
 
         # pins for enabling row and column switches at large current (small resistance)
-        self.row_pins_max = [32, 33, 36, 37, 40, 41, 44, 45, 48, 49]
-        self.column_pins_max = [34, 35, 38, 39, 42, 43, 46, 47, 50, 51]
+        self.row_pins_primary = [32, 33, 36, 37, 40, 41, 44, 45, 48, 49]
+        self.column_pins_primary= [34, 35, 38, 39, 42, 43, 46, 47, 50, 51]
         # pins for enabling row and column switches at small current (large resistance)
-        self.row_pins_min = []
-        self.column_pins_min = []
+        self.row_pins_auxiliary = []
+        self.column_pins_auxiliary = []
 
         # pins for enabling positive or negative current
         self.sign_pins = {'positive': 52, 'negative': 53}
@@ -95,7 +95,7 @@ class Control(Arduino):
 
         return True
 
-    def selectMagnet(self, row, column, primary=True, sign='positive'):
+    def selectMagnet(self, row, column, isPrimary=True, sign='positive'):
         '''
         Selects the magnet in (row,column) by setting the row and column switch to enable
         in either the 'positive' or 'negative' configuration, and all of the other
@@ -116,7 +116,7 @@ class Control(Arduino):
         self.current_row = row
         self.current_column = column
         self.current_sign = sign
-        self.current_primary = primary
+        self.current_isPrimary = isPrimary
 
         return True
 
@@ -131,8 +131,8 @@ class Control(Arduino):
         if not hasattr(self, 'current_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if not self.current_primary and array:
-            raise ValueError("Can only set current in array mode if magnet has been selected as primary")
+        if not self.current_isPrimary and array:
+            raise ValueError("Can only set currents in array mode if magnet has been selected as primary")
 
         # get required voltage
         voltage = self.__currentToVoltage(current)
@@ -143,7 +143,7 @@ class Control(Arduino):
             raise ValueError('The maximum current allowed on this row is ' +
                              str(max_current)[:5] + ' A')
 
-        self.setOneVoltage(voltage, array)
+        self.setVoltage(voltage, array)
 
         return True
 
@@ -157,8 +157,8 @@ class Control(Arduino):
         if not hasattr(self, 'current_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if not self.current_primary and array:
-            raise ValueError("Can only set current in array mode if magnet has been selected as primary")
+        if not self.current_isPrimary and array:
+            raise ValueError("Can only set voltages in array mode if magnet has been selected as primary")
         if np.abs(voltage) > self.max_voltage[self.current_row]:
             raise ValueError('The maximum voltage output on this row is ' +
                              str(self.max_voltage[self.current_row]) + ' V')
@@ -172,11 +172,11 @@ class Control(Arduino):
 
         # enable switches (row, column) depending on whether the magnet is primary
         if self.current_primary:
-            self.setHigh(self.column_pins_max[self.current_column])
-            self.setHigh(self.row_pins_max[self.current_row])
+            self.setHigh(self.column_pins_primary[self.current_column])
+            self.setHigh(self.row_pins_primary[self.current_row])
         else:
-            self.setHigh(self.column_pins_min[self.current_column])
-            self.setHigh(self.row_pins_min[self.current_row])
+            self.setHigh(self.column_pins_auxiliary[self.current_column])
+            self.setHigh(self.row_pins_auxiliary[self.current_row])
 
         self.setHigh(self.sign_pins[self.current_sign])
 
@@ -185,13 +185,19 @@ class Control(Arduino):
            (np.sign(voltage) == 1 and self.current_sign == 'negative'):
             self.__changeSign()
 
-        # if array parameter true, enable all rows except current row at low current
+        # need to configure all other magnets if array mode is True
         if array:
-            for row_pin_min, row_pin_max in zip(self.row_pins_min, self.row_pins_max):
-                if row_pin_min != self.row_pins_min[self.current_row]:
-                    self.setLow(row_pin_max)  # should already be set low from setOneCurrent() but
-                                              # for security we set one low every time we set the other high
-                    self.setHigh(row_pin_min)
+            # set all rows except selected to auxiliary function
+            for row_pin_auxiliary, row_pin_primary in zip(self.row_pins_auxiliary, self.row_pins_primary):
+                if row_pin_auxiliary != self.row_pins_auxiliary[self.current_row]:
+                    self.setLow(row_pin_primary)
+                    self.setHigh(row_pin_auxiliary)
+
+            # set all columns except selected to auxiliary function
+            for column_pin_auxiliary, column_pin_primary in zip(self.column_pins_auxiliary, self.column_pins_primary):
+                if column_pin_auxiliary != self.column_pins_auxiliary[self.current_column]:
+                    self.setLow(column_pin_primary)
+                    self.setHigh(column_pin_auxiliary)
 
         # set voltage on DAC
         binary = int(self.linearity_correction[self.current_row](np.abs(voltage))
