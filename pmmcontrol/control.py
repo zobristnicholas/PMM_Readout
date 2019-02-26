@@ -15,6 +15,11 @@ class Control(Arduino):
 
         # define resistor values in np array
         self.R_row = 356 * np.ones(10)
+
+        # define resistor values
+        self.R_primary = 620
+        self.R_auxiliary = 2400
+
         # value of current sense resistor
         self.R_sense = 0.1
 
@@ -57,6 +62,7 @@ class Control(Arduino):
         '''
         Performs a test of each row/column combination.
         '''
+
         # measure null current
         print("Measuring null current")
         self.null_current = self.readTotalCurrent()
@@ -118,7 +124,6 @@ class Control(Arduino):
         self.current_sign = sign
         self.current_isPrimary = isPrimary
         self.current_isArrayMode = isArrayMode
-        self.current_voltage
 
         return True
 
@@ -239,6 +244,11 @@ class Control(Arduino):
         return True
 
     def updateVoltage(self, voltage):
+        '''
+        Updates the voltage of the currently selected magnet without resetting all the enables.
+        Essentially just updates the DAC but cares for the sign of the voltage.
+        '''
+
         if not hasattr(self, 'voltage'):
             raise AttributeError("Initial voltage has not been set. " +
                                  " Run 'setVoltage()' first")
@@ -271,6 +281,9 @@ class Control(Arduino):
         return True
 
     def readTotalCurrent(self):
+        '''
+        Uses current sense circuit to measure the total current flowing to ground.
+        '''
 
         sense_voltage = self.analogRead(self.sense_pin)
 
@@ -281,12 +294,9 @@ class Control(Arduino):
 
     def resetMagnet(self):
         '''
-        Removes the magnetization in the magnet in (row, column) by oscillating an
-        exponentially decaying current. Magnet selection returned to previous state after
-        running. DAC gets set to zero.
+        Removes the magnetization in the currently selected magnet by oscillating an
+        exponentially decaying current. DAC finishes at 0V.
         '''
-        # record current state so that we can reinitialize after resetting requested
-        # magnet
 
         if self.isArrayMode:
             raise ValueError("Can not reset magnet that has been selected in array mode. Please reselect magnet.")
@@ -295,15 +305,22 @@ class Control(Arduino):
         tt = np.arange(0, 70)
         max_current = round(self.max_voltage[self.current_row] /
                             self.R_row[self.current_row], 4)
-        current_list = np.exp(-tt / 20.0) * np.sin(tt / 3.0) * max_current
+        current_list = np.exp(-tt / 20.0) * np.cos(tt / 3.0) * max_current
         current_list = np.append(current_list, 0)
 
-        self.setCurrent(0)
+        self.setCurrent(max_current)
         for current in current_list:
             self.updateCurrent(current)
             sleep(0.1)
 
         return True
+
+    def resetAllMagnet(self):
+        '''
+        Resets the field of each magnet by iterating through rows and columns
+        '''
+
+        raise NotImplementedError
 
     def findResonances(self, frequency_range):
         '''
@@ -328,6 +345,7 @@ class Control(Arduino):
         '''
         raise NotImplementedError
 
+    # DEPRECATED
     def __changeSign(self):
         '''
         Changes the sign of the row and column currently selected by selectMagnet.
