@@ -23,15 +23,17 @@ class Control(Arduino):
         # value of current sense resistor
         self.R_sense = 0.1
 
+        self.max_voltage = 4
+
         # pins for enabling row and column switches at large current (small resistance)
-        self.row_pins_primary = [32, 33, 36, 37, 40, 41, 44, 45, 48, 49]
-        self.column_pins_primary= [34, 35, 38, 39, 42, 43, 46, 47, 50, 51]
+        self.row_pins_primary = [53, 49, 45, 41, 37, 33, 29, 25, 9]
+        self.column_pins_primary= [5, 52, 48, 44, 40, 36, 32, 28, 24, 8]
         # pins for enabling row and column switches at small current (large resistance)
-        self.row_pins_auxiliary = []
-        self.column_pins_auxiliary = []
+        self.row_pins_auxiliary = [51, 47, 43, 39, 35, 31, 27, 23, 7]
+        self.column_pins_auxiliary = [3, 50, 46, 42, 38, 34, 30, 26, 22, 6]
 
         # pins for enabling positive or negative current
-        self.sign_pins = {'positive': 52, 'negative': 53}
+        self.sign_pins = {'positive': 4, 'negative': 2}
         # all output pins enabled for use
         self.enable_pins = self.row_pins_primary + self.row_pins_auxiliary + self.column_pins_primary + self.column_pins_auxiliary + list(self.sign_pins.values())
 
@@ -108,6 +110,7 @@ class Control(Arduino):
         switches to disable (open circuit). A magnet selected as primary will be
         enabled with maximum current (small resistor).
         '''
+
         # check inputs
         if sign != 'positive' and sign != 'negative':
             raise ValueError("parameter 'sign' must be either 'positive' or 'negative'")
@@ -170,9 +173,9 @@ class Control(Arduino):
                                  " Run 'selectMagnet()' first")
         if not self.current_isPrimary and self.current_isArrayMode:
             raise ValueError("Can only set voltages in array mode if magnet has been selected as primary")
-        if np.abs(voltage) > self.max_voltage[self.current_row]:
-            raise ValueError('The maximum voltage output on this row is ' +
-                             str(self.max_voltage[self.current_row]) + ' V')
+        if np.abs(voltage) > self.max_voltage:
+            raise ValueError('The maximum voltage output is ' +
+                             str(self.max_voltage) + ' V')
 
         # disable all switches
         for pin in self.enable_pins:
@@ -218,8 +221,7 @@ class Control(Arduino):
             posDAC = True
 
         # set voltage on DAC
-        binary = int(self.linearity_correction[self.current_row](np.abs(voltage))
-                     * 2**16 / self.Vcc)
+        binary = int(np.abs(voltage)* 2**16 / self.Vcc)
         self.writeDAC(binary)
 
         self.current_posDAC = posDAC # keep track of sign of DAC
@@ -269,9 +271,9 @@ class Control(Arduino):
                                  " Run 'setVoltage()' first")
         if not self.current_isPrimary and self.isArrayMode:
             raise ValueError("Can only set voltages in array mode if magnet has been selected as primary")
-        if np.abs(voltage) > self.max_voltage[self.current_row]:
-            raise ValueError('The maximum voltage output on this row is ' +
-                             str(self.max_voltage[self.current_row]) + ' V')
+        if np.abs(voltage) > self.max_voltage:
+            raise ValueError('The maximum voltage output is ' +
+                             str(self.max_voltage) + ' V')
 
         # change enable pins if sign change is necessary
         if (np.sign(voltage) == -1 and self.current_sign == 'positive') or \
@@ -287,8 +289,7 @@ class Control(Arduino):
                 self.current_posDAC = True # update state
 
         # set voltage on DAC
-        binary = int(self.linearity_correction[self.current_row](np.abs(voltage))
-                     * 2 ** 16 / self.Vcc)
+        binary = int(np.abs(voltage) * 2 ** 16 / self.Vcc)
         self.writeDAC(binary)
 
         self.current_voltage = voltage
@@ -303,7 +304,7 @@ class Control(Arduino):
         sense_voltage = self.analogRead(self.sense_pin)
 
         # differential voltage across current sense IC with gain of 50 and offset of 2.5V
-        diff_voltage = (sense_voltage - 2.5) / 50
+        diff_voltage = (sense_voltage - 7.5) / 50
 
         return diff_voltage / self.R_sense
 
@@ -326,6 +327,7 @@ class Control(Arduino):
         current_list = np.exp(-tt / 20.0) * np.cos(tt / 3.0) * max_current
         current_list = np.append(current_list, 0)
 
+        # call setCurrent() first to allow updateCurrent()
         self.setCurrent(max_current)
         for current in current_list:
             self.updateCurrent(current)
