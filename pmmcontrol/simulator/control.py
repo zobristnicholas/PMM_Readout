@@ -12,13 +12,9 @@ class Control(Detector):
         self.R_primary = 620
         self.R_auxiliary = 2400
 
-        self.max_voltage = 4
+        self.max_voltage = 14
 
-    def chooseResistor(self, primary):
-        if primary:
-            return self.R_primary
-        if not primary:
-            return self.R_auxiliary
+        Detector.__init__(self, self.rows, self.columns)
 
     def selectMagnet(self, row, column, isPrimary=True, isArrayMode=False, sign='positive'):
 
@@ -47,7 +43,7 @@ class Control(Detector):
 
     def setCurrent(self, current):
 
-        if not hasattr(self, 'current_sign'):
+        if not hasattr(self, 'curr_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
         if not self.curr_isPrimary and self.curr_isArrayMode:
@@ -62,9 +58,9 @@ class Control(Detector):
         # get required voltage
         voltage = self.__currentToVoltage(set_current)
 
-        if np.abs(voltage) > self.max_voltage[self.curr_row]:
+        if np.abs(voltage) > self.max_voltage:
             max_current = round(self.max_voltage /
-                                self.chooseResistor(self.curr_isPrimary), 4)
+                                self.__chooseResistor(self.curr_isPrimary), 4)
             raise ValueError('The maximum current allowed on this row is ' +
                              str(max_current)[:5] + ' A')
 
@@ -88,6 +84,12 @@ class Control(Detector):
         Each row has a large resistor whose value is recorded in R_row.
         '''
 
-        voltage = self.chooseResistor(self.curr_isPrimary) * current
+        voltage = self.__chooseResistor(self.curr_isPrimary) * current
 
         return voltage
+
+    def __chooseResistor(self, primary):
+        if primary:
+            return self.R_primary
+        if not primary:
+            return self.R_auxiliary
