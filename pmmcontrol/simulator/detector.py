@@ -34,10 +34,10 @@ class Detector():
         self.resArray[row, col].setCurrent(self.row_currents[row] + self.col_currents[col])
 
 class Resonator(Hysteresis):
-    def __init__(self, freq, N=10, alpha=1, beta=1):
+    def __init__(self, freq, N=10):
         self.freq = freq
 
-        Hysteresis.__init__(self, N, alpha, beta)
+        Hysteresis.__init__(self, N)
 
     def setCurrent(self, I):
         self.freq = self.__currentToFreq(I)
