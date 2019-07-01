@@ -27,6 +27,9 @@ class Detector():
         for row in range(self.rows):
             self.__updateRes(row, col)
 
+    def resPlot(self, row, col):
+        self.resArray[row, col].plot()
+
     def displayCurrents(self):
         return False
 

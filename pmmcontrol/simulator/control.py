@@ -81,6 +81,18 @@ class Control(Detector):
                     self.setColCurrent(-set_current/6, col)
 
         return True
+
+    def showHistory(self):
+        '''
+        Shows plot of the history of the selected magnet
+        '''
+
+        if not hasattr(self, 'curr_sign'):
+            raise AttributeError("Some attributes have not been set. " +
+                                 " Run 'selectMagnet()' first")
+
+        self.plotRes(self.curr_row, self.curr_column)
+
     def __currentToVoltage(self, current):
         '''
         Converts the requested current into a voltage required to be output by the DAC.
