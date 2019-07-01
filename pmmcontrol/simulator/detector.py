@@ -34,29 +34,28 @@ class Detector():
         self.resArray[row, col].setCurrent(self.row_currents[row] + self.col_currents[col])
 
 class Resonator(Hysteresis):
-    def __init__(self, freq, N=10, sat_current=30):
+    def __init__(self, baseFreq, N=100, sat_current=0.020):
         self.__sat_current = sat_current
 
-        self.__freq = freq
+        self.__baseFreq = baseFreq
+
+        self.__freq = self.__baseFreq
         self.__field = 0
 
         self.__size = N
 
+        self.__scale_factor = (self.__size / 2) / self.__sat_current
+
         Hysteresis.__init__(self, N)
 
     def setCurrent(self, I):
-        self.freq = self.__currentToFreq(I)
 
-        return True
+        self.__field = self.setX(int(self.__scale_factor * I))
+
+        return self.__fieldToFreq(self.__field)
 
     def getFrequency(self):
         return self.__freq
 
-    def __currentToFreq(self, I):
-        scale_factor = (self.__size / 2) / self.__max_current
-        self.__field = self.setX(int(scale_factor * I))
-
-        return self.__fieldToFreq(self.__field)
-
     def __fieldToFreq(self, B):
-        self.__freq = self.__freq + B
+        self.__baseFreq = self.__freq + B

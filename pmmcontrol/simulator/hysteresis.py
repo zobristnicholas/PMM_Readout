@@ -20,12 +20,14 @@ class Hysteresis():
         #store size of matrix
         self.__size = N
 
+        self.__nScale = (100 / (self.__size*self.__size))
+
         #list of data points to be appended to
         self.__xValues = np.append(np.array([]), self.__x)
         self.__yValues = np.append(np.array([]), self.__y)
 
-        #fill the relay matrix in starting position
-        self.__relayFill()
+        #fill the relay matrix in starting position <- probably don't do this ever
+        #self.__relayFill()
 
         #fill the weights matrix to adjust behavior of hysteresis
         self.__weightFill()
@@ -34,6 +36,9 @@ class Hysteresis():
         '''
         Change x-coordinate of hysteresis function
         '''
+
+        print("Setting to: ", x)
+
         if (not isinstance(x, int)):
             raise ValueError("Parameter must be integer")
 
@@ -83,11 +88,18 @@ class Hysteresis():
         self.__yValues = np.append(self.__yValues, self.__y)
 
         #FOR TESTING PURPOSES
-        self.__plot()
+        #self.plot()
+        #self.__printHalf(self.__relay)
 
         return True
 
-    def __plot(self):
+    def getXYData(self):
+        '''
+        Returns 2D array with first index xValues and second index yValues
+        '''
+        return np.array([self.__xValues, self.__yValues])
+
+    def plot(self):
         '''
         Can be used to visually inspect relay weight distribution
         '''
@@ -95,7 +107,12 @@ class Hysteresis():
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
 
+        xlim = self.__size / 1.9
+        ylim = self.__nScale * (self.__size * (self.__size + 1) / 1.9)
+
         ax.plot(self.__xValues, self.__yValues)
+        ax.set_xlim(-xlim , xlim)
+        ax.set_ylim(-ylim, ylim)
 
         plt.show()
 
@@ -112,6 +129,9 @@ class Hysteresis():
             fillArr = np.ones(self.__size - n) * fill
             np.fill_diagonal(self.__weights[n:], fillArr)
             np.fill_diagonal(self.__weights[:,n:], fillArr)
+
+        #scale by N^2
+        self.__weights = self.__weights * self.__nScale
 
         return True
 

@@ -42,14 +42,17 @@ class Control(Detector):
         return True
 
     def setCurrent(self, current):
-
+        '''
+        Set current in milli amps
+        '''
         if not hasattr(self, 'curr_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
         if not self.curr_isPrimary and self.curr_isArrayMode:
             raise ValueError("Can only set currents in array mode if magnet has been selected as primary")
 
-        set_current = current
+        #in mA
+        set_current = current / 1000
 
         #adjust sign of current
         if self.curr_sign == 'negative':
@@ -62,7 +65,7 @@ class Control(Detector):
             max_current = round(self.max_voltage /
                                 self.__chooseResistor(self.curr_isPrimary), 4)
             raise ValueError('The maximum current allowed on this row is ' +
-                             str(max_current)[:5] + ' A')
+                             str(max_current)[:5] * 1000 + ' mA')
 
         # to achieve I current on current magnet, we send I/2 down the row and the column
         self.setRowCurrent(set_current/2, self.curr_row)
