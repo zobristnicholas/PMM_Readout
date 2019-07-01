@@ -8,21 +8,21 @@ class Hysteresis():
             raise ValueError("Matrix size must be even")
 
         #starting point
-        self.x = int(0)
-        self.y = int(0)
+        self.__x = int(0)
+        self.__y = int(0)
 
         #matrix of relays that can be flipped up (+1) or down (-1)
-        self.relay = np.zeros((N,N))
+        self.__relay = np.zeros((N,N))
 
         #matrix of weights to be applied to each relay
-        self.weights = np.ones((N,N))
+        self.__weights = np.ones((N,N))
 
         #store size of matrix
-        self.size = N
+        self.__size = N
 
         #list of data points to be appended to
-        self.xValues = np.append(np.array([]), self.x)
-        self.yValues = np.append(np.array([]), self.y)
+        self.__xValues = np.append(np.array([]), self.__x)
+        self.__yValues = np.append(np.array([]), self.__y)
 
         #fill the relay matrix in starting position
         self.__relayFill()
@@ -30,21 +30,21 @@ class Hysteresis():
         #fill the weights matrix to adjust behavior of hysteresis
         self.__weightFill()
 
-    def move(self, x):
+    def setX(self, x):
         '''
         Change x-coordinate of hysteresis function
         '''
         if (not isinstance(x, int)):
             raise ValueError("Parameter must be integer")
 
-        if x > self.x:
-            for i in range(self.x, x):
+        if x > self.__x:
+            for i in range(self.__x, x):
                 self.increment('up')
-        if x < self.x:
-            for i in range(x, self.x):
+        if x < self.__x:
+            for i in range(x, self.__x):
                 self.increment('down')
 
-        return True
+        return self.__y
 
     def increment(self, direction):
         '''
@@ -58,32 +58,32 @@ class Hysteresis():
 
             #only adjust matrix if x-coord is within +/- N/2
             #otherwise let x-coord increase without change of y-coord. This represents saturation
-            if self.x >= -self.size/2 and self.x < self.size/2:
+            if self.__x >= -self.__size/2 and self.__x < self.__size/2:
 
                 #fill one row (at current coordinate) of relay matrix with "up" relays
-                self.relay[self.size - (self.x + self.size//2)- 1].fill(1)
+                self.__relay[self.__size - (self.__x + self.__size//2)- 1].fill(1)
 
-            self.x = self.x + 1
+            self.__x = self.__x + 1
 
         if direction == 'down':
             # only adjust matrix if x-coord is within +/- N/2
             # otherwise let x-coord increase without change of y-coord. This represents saturation
-            if self.x > -self.size/2 and self.x <= self.size/2:
+            if self.__x > -self.__size/2 and self.__x <= self.__size/2:
 
                 #fill one column of relay matrix with "down" relays
-                self.relay[:, (self.x + self.size//2) - 1].fill(-1)
+                self.__relay[:, (self.__x + self.__size//2) - 1].fill(-1)
 
-            self.x = self.x - 1
+            self.__x = self.__x - 1
 
         #update y-coord using a weighted sum of relay matrix
-        self.y = self.__sumHalf(self.relay, self.weights)
+        self.__y = self.__sumHalf(self.__relay, self.__weights)
 
         #update coordinate lists
-        self.xValues = np.append(self.xValues, self.x)
-        self.yValues = np.append(self.yValues, self.y)
+        self.__xValues = np.append(self.__xValues, self.__x)
+        self.__yValues = np.append(self.__yValues, self.__y)
 
         #FOR TESTING PURPOSES
-        #self.__plot()
+        self.__plot()
 
         return True
 
@@ -95,7 +95,7 @@ class Hysteresis():
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
 
-        ax.plot(self.xValues, self.yValues)
+        ax.plot(self.__xValues, self.__yValues)
 
         plt.show()
 
@@ -107,11 +107,11 @@ class Hysteresis():
         '''
 
         #currently distributed as a gradient that decreases away from the center diagonal
-        for n in range(0, self.size):
-            fill = 1-(1/(self.size - 1) * n)
-            fillArr = np.ones(self.size - n) * fill
-            np.fill_diagonal(self.weights[n:], fillArr)
-            np.fill_diagonal(self.weights[:,n:], fillArr)
+        for n in range(0, self.__size):
+            fill = 1-(1/(self.__size - 1) * n)
+            fillArr = np.ones(self.__size - n) * fill
+            np.fill_diagonal(self.__weights[n:], fillArr)
+            np.fill_diagonal(self.__weights[:,n:], fillArr)
 
         return True
 
@@ -120,9 +120,9 @@ class Hysteresis():
         Optional function to set initial state of all relays
         '''
 
-        for n in range(self.size//2, self.size):
-            self.relay[n].fill(1)
-            self.relay[:, n].fill(-1)
+        for n in range(self.__size//2, self.__size):
+            self.__relay[n].fill(1)
+            self.__relay[:, n].fill(-1)
 
         return True
 
