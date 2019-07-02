@@ -10,10 +10,6 @@ class Hysteresis():
         # store size of matrix
         self.__size = N
 
-        #starting point
-        self.__x = int(0)
-        self.__y = int(0)
-
         #configure plotting details
         self.__xLabel = xParam
         self.__yLabel = yParam
@@ -25,7 +21,7 @@ class Hysteresis():
         self.__weights = np.ones((N,N))
 
         # fill the weights matrix to adjust behavior of hysteresis
-        self.__weightFill()
+        #self.__weightFill()
 
         # temporary scaling of y-values until curve is parameterized
         self.__nScale = (100 / (self.__size * self.__size))
@@ -37,12 +33,16 @@ class Hysteresis():
 
         ##Y SCALING NOT IMPLEMENTED
 
-        #list of data points to be appended to
+        #fill the relay matrix in starting position
+        self.__relayFill()
+
+        # starting point
+        self.__x = int(0)
+        self.__y = self.__sumHalf(self.__relay, self.__weights)
+
+        # list of data points to be appended to
         self.__xValues = np.append(np.array([]), self.__x)
         self.__yValues = np.append(np.array([]), self.__y)
-
-        #fill the relay matrix in starting position <- probably don't do this ever
-        #self.__relayFill()
 
     def setX(self, x):
         '''
@@ -117,7 +117,7 @@ class Hysteresis():
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
 
-        xlim = ((self.__size / self.__xScale) / 1.9)
+        xlim = ((self.__size / self.__xScale) / 1.7)
         ylim = self.__nScale * (self.__size * (self.__size + 1) / 1.9)
 
         ax.plot(self.__xValues, self.__yValues)
@@ -148,10 +148,11 @@ class Hysteresis():
         '''
         Optional function to set initial state of all relays
         '''
+        np.fill_diagonal(self.__relay[0:], np.zeros(self.__size))
+        for n in range(0, self.__size):
+            np.fill_diagonal(self.__relay[n:], np.ones(self.__size - n))
+            np.fill_diagonal(self.__relay[:,n:], -1 * np.ones(self.__size - n))
 
-        for n in range(self.__size//2, self.__size):
-            self.__relay[n].fill(1)
-            self.__relay[:, n].fill(-1)
 
         return True
 
