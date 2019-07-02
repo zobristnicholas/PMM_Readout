@@ -91,7 +91,7 @@ class Control(Detector):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
 
-        self.plotRes(self.curr_row, self.curr_column)
+        self.resPlot(self.curr_row, self.curr_column)
 
     def __currentToVoltage(self, current):
         '''

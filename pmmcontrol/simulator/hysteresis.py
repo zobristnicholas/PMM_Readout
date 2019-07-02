@@ -2,14 +2,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class Hysteresis():
-    def __init__(self, N=10):
+    def __init__(self, xSaturation, N=10, xParam='', yParam=''):
 
         if not (N%2 == 0):
             raise ValueError("Matrix size must be even")
 
+        # store size of matrix
+        self.__size = N
+
         #starting point
         self.__x = int(0)
         self.__y = int(0)
+
+        #configure plotting details
+        self.__xLabel = xParam
+        self.__yLabel = yParam
 
         #matrix of relays that can be flipped up (+1) or down (-1)
         self.__relay = np.zeros((N,N))
@@ -17,10 +24,18 @@ class Hysteresis():
         #matrix of weights to be applied to each relay
         self.__weights = np.ones((N,N))
 
-        #store size of matrix
-        self.__size = N
+        # fill the weights matrix to adjust behavior of hysteresis
+        self.__weightFill()
 
-        self.__nScale = (100 / (self.__size*self.__size))
+        # temporary scaling of y-values until curve is parameterized
+        self.__nScale = (100 / (self.__size * self.__size))
+        self.__weights = self.__weights * self.__nScale
+
+        #scale x values according to the saturation parameter
+        self.__xSaturation = xSaturation
+        self.__xScale = (self.__size / 2) / self.__xSaturation
+
+        ##Y SCALING NOT IMPLEMENTED
 
         #list of data points to be appended to
         self.__xValues = np.append(np.array([]), self.__x)
@@ -29,24 +44,19 @@ class Hysteresis():
         #fill the relay matrix in starting position <- probably don't do this ever
         #self.__relayFill()
 
-        #fill the weights matrix to adjust behavior of hysteresis
-        self.__weightFill()
-
     def setX(self, x):
         '''
         Change x-coordinate of hysteresis function
         '''
 
-        print("Setting to: ", x)
+        #need to use an integer value (xScaled) when dealing with the relay matrix
+        xScaled = int(x * self.__xScale)
 
-        if (not isinstance(x, int)):
-            raise ValueError("Parameter must be integer")
-
-        if x > self.__x:
-            for i in range(self.__x, x):
+        if xScaled > self.__x:
+            for i in range(self.__x, xScaled):
                 self.increment('up')
-        if x < self.__x:
-            for i in range(x, self.__x):
+        if xScaled < self.__x:
+            for i in range(xScaled, self.__x):
                 self.increment('down')
 
         return self.__y
@@ -84,7 +94,7 @@ class Hysteresis():
         self.__y = self.__sumHalf(self.__relay, self.__weights)
 
         #update coordinate lists
-        self.__xValues = np.append(self.__xValues, self.__x)
+        self.__xValues = np.append(self.__xValues, self.__x / self.__xScale)
         self.__yValues = np.append(self.__yValues, self.__y)
 
         #FOR TESTING PURPOSES
@@ -107,12 +117,14 @@ class Hysteresis():
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
 
-        xlim = self.__size / 1.9
+        xlim = ((self.__size / self.__xScale) / 1.9)
         ylim = self.__nScale * (self.__size * (self.__size + 1) / 1.9)
 
         ax.plot(self.__xValues, self.__yValues)
         ax.set_xlim(-xlim , xlim)
         ax.set_ylim(-ylim, ylim)
+        ax.set_xlabel(self.__xLabel)
+        ax.set_ylabel(self.__yLabel)
 
         plt.show()
 
@@ -129,9 +141,6 @@ class Hysteresis():
             fillArr = np.ones(self.__size - n) * fill
             np.fill_diagonal(self.__weights[n:], fillArr)
             np.fill_diagonal(self.__weights[:,n:], fillArr)
-
-        #scale by N^2
-        self.__weights = self.__weights * self.__nScale
 
         return True
 
