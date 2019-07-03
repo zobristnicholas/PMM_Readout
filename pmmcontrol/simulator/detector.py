@@ -47,6 +47,8 @@ class Resonator(Hysteresis):
         self.__distLoopMag = 0
 
         self.__satCurrent = satCurrent
+        self.__satMag = 1.1
+        self.__remanence = 1
         self.__satField = self.__loopField(self.__satCurrent, self.__loopRadius, self.__distLoopMag,
                                                 self.__nLoops)
 
@@ -58,11 +60,11 @@ class Resonator(Hysteresis):
 
         self.__size = N
 
-        self.__satField = self.__loopField(satCurrent, self.__loopRadius, self.__distLoopMag,
+        self.__satField = self.__loopField(self.__satCurrent, self.__loopRadius, self.__distLoopMag,
                                                 self.__nLoops)
 
-        Hysteresis.__init__(self, self.__satField, self.__size, 'Applied Field (T)',
-                            'Magnetization (T/u_0)')
+        Hysteresis.__init__(self, self.__satField, self.__satMag, self.__remanence, self.__size, 'Applied Field (T)',
+                            'Magnetization (A/m)')
 
     def setCurrent(self, I):
 

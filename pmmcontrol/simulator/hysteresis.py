@@ -2,38 +2,44 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class Hysteresis():
-    def __init__(self, xSaturation, N=10, xParam='', yParam=''):
+    def __init__(self, xSaturation, ySaturation, yRemanence, N=10, xParam='', yParam=''):
+
+        if not isinstance(N, int):
+            raise ValueError("Matrix size must be an integer value")
 
         if not (N%2 == 0):
             raise ValueError("Matrix size must be even")
 
+        if not ySaturation > yRemanence:
+            raise ValueError("The y-intercept (remanence) must be lower than the ySaturation value")
+
         # store size of matrix
         self.__size = N
 
-        #configure plotting details
+        # configure plotting details
         self.__xLabel = xParam
         self.__yLabel = yParam
 
-        #matrix of relays that can be flipped up (+1) or down (-1)
+        # matrix of relays that can be flipped up (+1) or down (-1)
         self.__relay = np.zeros((N,N))
 
-        #matrix of weights to be applied to each relay
+        # matrix of weights to be applied to each relay
         self.__weights = np.ones((N,N))
 
         # fill the weights matrix to adjust behavior of hysteresis
-        #self.__weightFill()
+        self.__diagFill(self.__weights)
 
-        # temporary scaling of y-values until curve is parameterized
-        self.__nScale = (100 / (self.__size * self.__size))
-        self.__weights = self.__weights * self.__nScale
-
-        #scale x values according to the saturation parameter
         self.__xSaturation = xSaturation
-        self.__xScale = (self.__size / 2) / self.__xSaturation
+        self.__ySaturation = ySaturation
+        self.__yRemanence = yRemanence
 
-        ##Y SCALING NOT IMPLEMENTED
+        # Scale according to input parameters
+        self.__parameterScale()
 
-        #fill the relay matrix in starting position
+        # scaling of plot window
+        self.__yMax = self.__sumHalf(self.__weights, np.ones((N,N)))
+
+        # fill the relay matrix in starting position
         self.__relayFill()
 
         # starting point
@@ -49,7 +55,7 @@ class Hysteresis():
         Change x-coordinate of hysteresis function
         '''
 
-        #need to use an integer value (xScaled) when dealing with the relay matrix
+        # need to use an integer value (xScaled) when dealing with the relay matrix
         xScaled = int(x * self.__xScale)
 
         if xScaled > self.__x:
@@ -71,8 +77,8 @@ class Hysteresis():
 
         if direction == 'up':
 
-            #only adjust matrix if x-coord is within +/- N/2
-            #otherwise let x-coord increase without change of y-coord. This represents saturation
+            # only adjust matrix if x-coord is within +/- N/2
+            # otherwise let x-coord increase without change of y-coord. This represents saturation
             if self.__x >= -self.__size/2 and self.__x < self.__size/2:
 
                 #fill one row (at current coordinate) of relay matrix with "up" relays
@@ -90,10 +96,10 @@ class Hysteresis():
 
             self.__x = self.__x - 1
 
-        #update y-coord using a weighted sum of relay matrix
+        # update y-coord using a weighted sum of relay matrix
         self.__y = self.__sumHalf(self.__relay, self.__weights)
 
-        #update coordinate lists
+        # update coordinate lists
         self.__xValues = np.append(self.__xValues, self.__x / self.__xScale)
         self.__yValues = np.append(self.__yValues, self.__y)
 
@@ -118,7 +124,7 @@ class Hysteresis():
         ax = fig.add_subplot(1, 1, 1)
 
         xlim = ((self.__size / self.__xScale) / 1.7)
-        ylim = self.__nScale * (self.__size * (self.__size + 1) / 1.9)
+        ylim = self.__yMax * 1.1
 
         ax.plot(self.__xValues, self.__yValues)
         ax.set_xlim(-xlim , xlim)
@@ -130,17 +136,36 @@ class Hysteresis():
 
         return True
 
-    def __weightFill(self):
+    def __parameterScale(self):
+        # scale weights according to the remanence parameter
+        remScale = self.__yRemanence / self.__weights[0:self.__size // 2, 0:self.__size // 2].sum()
+        self.__weights = self.__weights * remScale
+
+        satAdjust = np.ones((self.__size//2, self.__size//2))
+        self.__diagFill(satAdjust)
+
+        satAdjust = (self.__ySaturation - self.__yRemanence) * \
+                    (satAdjust / (2 * self.__sumHalf(satAdjust, np.ones((self.__size//2, self.__size//2)))))
+
+        self.__weights[0:self.__size // 2, self.__size//2: self.__size] = satAdjust
+        self.__weights[self.__size//2: self.__size, 0:self.__size // 2] = satAdjust
+
+        # scale x values according to the saturation parameter
+        self.__xScale = (self.__size / 2) / self.__xSaturation
+
+        return True
+
+    def __diagFill(self, mat):
         '''
         Function for filling weight matrix
         '''
 
-        #currently distributed as a gradient that decreases away from the center diagonal
+        # currently distributed as a gradient that decreases away from the center diagonal
         for n in range(0, self.__size):
             fill = 1-(1/(self.__size - 1) * n)
             fillArr = np.ones(self.__size - n) * fill
-            np.fill_diagonal(self.__weights[n:], fillArr)
-            np.fill_diagonal(self.__weights[:,n:], fillArr)
+            np.fill_diagonal(mat[n:], fillArr)
+            np.fill_diagonal(mat[:,n:], fillArr)
 
         return True
 
@@ -155,7 +180,6 @@ class Hysteresis():
 
 
         return True
-
 
     def __sumHalf(self, mat1, mat2):
         '''
@@ -172,7 +196,7 @@ class Hysteresis():
 
         rowSum = np.zeros(size)
 
-        #sum up scalar product of each row
+        # sum up scalar product of each row
         for row in range(0, size):
             row1 = mat1[row][:(size-row)]
             row2 = mat2[row][:(size-row)]
