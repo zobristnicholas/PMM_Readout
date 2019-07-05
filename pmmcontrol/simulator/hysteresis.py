@@ -153,6 +153,8 @@ class Hysteresis():
         # scale x values according to the saturation parameter
         self.__xScale = (self.__size / 2) / self.__xSaturation
 
+        self.__printHalf(self.__weights)
+
         return True
 
     def __diagFill(self, mat):

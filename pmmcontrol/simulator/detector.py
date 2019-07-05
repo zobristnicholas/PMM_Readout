@@ -38,17 +38,17 @@ class Detector():
         self.resArray[row, col].setCurrent(self.row_currents[row] + self.col_currents[col])
 
 class Resonator(Hysteresis):
-    def __init__(self, baseFreq, N=100, satCurrent=0.020):
+    def __init__(self, baseFreq, N=10, satCurrent=0.020, satMag=1401.4, remanence=949.36):
 
         #Resonator properties
         self.__baseFreq = baseFreq
-        self.__nLoops = 1
-        self.__loopRadius = 1
+        self.__nLoops = 10
+        self.__loopRadius = 0.0001
         self.__distLoopMag = 0
 
         self.__satCurrent = satCurrent
-        self.__satMag = 1401.4
-        self.__remanence = 949.36
+        self.__satMag = satMag
+        self.__remanence = remanence
         self.__satField = self.__loopField(self.__satCurrent, self.__loopRadius, self.__distLoopMag,
                                                 self.__nLoops)
 
@@ -66,6 +66,11 @@ class Resonator(Hysteresis):
         Hysteresis.__init__(self, self.__satField, self.__satMag, self.__remanence, self.__size, 'Applied Field (T)',
                             'Magnetization (A/m)')
 
+    @property
+    def freq(self):
+        return self.__freq
+
+
     def setCurrent(self, I):
 
         #Comute B-field from current flow
@@ -77,13 +82,6 @@ class Resonator(Hysteresis):
         self.__fieldAtRes = mu_0 * magnetization
 
         return self.__fieldToFreq(self.__fieldAtRes)
-
-    def getData(self):
-        '''
-        Returns dictionary containing frequency, magnetization, and field of current resonator
-        '''
-        return {"freq": self.__freq, "mag": self.__mag, "fieldAtMagnet": self.__fieldAtMagnet,
-                "fieldAtRes": self.__fieldAtRes}
 
     def __loopField(self, I, R, Z, N):
         return N * (mu_0 / 2) * ((R**2 * I)/(Z**2 + R**2)**(3/2))
