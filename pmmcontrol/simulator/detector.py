@@ -47,8 +47,8 @@ class Resonator(Hysteresis):
         self.__distLoopMag = 0
 
         self.__satCurrent = satCurrent
-        self.__satMag = 1.1
-        self.__remanence = 1
+        self.__satMag = 1401.4
+        self.__remanence = 949.36
         self.__satField = self.__loopField(self.__satCurrent, self.__loopRadius, self.__distLoopMag,
                                                 self.__nLoops)
 

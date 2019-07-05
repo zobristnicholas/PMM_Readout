@@ -1,5 +1,6 @@
 from pmmcontrol.simulator.detector import Detector
 import numpy as np
+from time import sleep
 
 class Control(Detector):
 
@@ -58,14 +59,12 @@ class Control(Detector):
         if self.curr_sign == 'negative':
             set_current = -set_current
 
-        # get required voltage
-        voltage = self.__currentToVoltage(set_current)
+        max_current = round(self.max_voltage /
+                            self.__chooseResistor(self.curr_isPrimary), 4)
 
-        if np.abs(voltage) > self.max_voltage:
-            max_current = round(self.max_voltage /
-                                self.__chooseResistor(self.curr_isPrimary), 4)
+        if set_current > max_current:
             raise ValueError('The maximum current allowed on this row is ' +
-                             str(max_current)[:5] * 1000 + ' mA')
+                             str(max_current * 1000)[:5] + ' mA')
 
         # to achieve I current on current magnet, we send I/2 down the row and the column
         self.setRowCurrent(set_current/2, self.curr_row)
@@ -79,6 +78,34 @@ class Control(Detector):
             for col in range(self.cols):
                 if col != self.curr_column:
                     self.setColCurrent(-set_current/6, col)
+
+        return True
+
+    def resetMagnet(self):
+        '''
+        Removes the magnetization in the currently selected magnet by oscillating an
+        exponentially decaying current. DAC finishes at 0V.
+        '''
+
+        if not hasattr(self, 'curr_sign'):
+            raise AttributeError("Some attributes have not been set. " +
+                                 " Run 'selectMagnet()' first")
+        if self.curr_isArrayMode:
+            raise ValueError("Can not reset magnet that has been selected in array mode. Please reselect magnet.")
+
+        # set oscillating and exponentially decaying current through (row, column) magnet
+        tt = np.arange(0, 70)
+        max_current = round(self.max_voltage /
+                            self.__chooseResistor(self.curr_isPrimary), 4)
+        current_list = np.exp(-tt / 20.0) * np.cos(tt / 3.0) * max_current
+        current_list = np.append(current_list, 0)
+
+        # call setCurrent() first to allow updateCurrent()
+        self.setCurrent(max_current)
+        for current in 1000 * current_list:
+            print("Setting current to: ", current)
+            self.setCurrent(current)
+            sleep(0.1)
 
         return True
 
