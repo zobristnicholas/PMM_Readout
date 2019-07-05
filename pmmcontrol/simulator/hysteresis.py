@@ -141,6 +141,7 @@ class Hysteresis():
         remScale = self.__yRemanence / self.__weights[0:self.__size // 2, 0:self.__size // 2].sum()
         self.__weights = self.__weights * remScale
 
+        # adjust weights according to the y-saturation parameter
         satAdjust = np.ones((self.__size//2, self.__size//2))
         self.__diagFill(satAdjust)
 
@@ -153,19 +154,23 @@ class Hysteresis():
         # scale x values according to the saturation parameter
         self.__xScale = (self.__size / 2) / self.__xSaturation
 
-        self.__printHalf(self.__weights)
-
         return True
 
     def __diagFill(self, mat):
         '''
-        Function for filling weight matrix
+        Fills matrix with with values 0...1 with 1 on the center diagonal and 0 on the
+        opposing corners
         '''
 
+        if not mat.shape[0] == mat.shape[1]:
+            raise ValueError("Matrices must be square")
+
+        size = mat.shape[0]
+
         # currently distributed as a gradient that decreases away from the center diagonal
-        for n in range(0, self.__size):
-            fill = 1-(1/(self.__size - 1) * n)
-            fillArr = np.ones(self.__size - n) * fill
+        for n in range(0, size):
+            fill = 1-(1/(size - 1) * n)
+            fillArr = np.ones(size - n) * fill
             np.fill_diagonal(mat[n:], fillArr)
             np.fill_diagonal(mat[:,n:], fillArr)
 
@@ -191,7 +196,7 @@ class Hysteresis():
         if not mat1.shape == mat2.shape:
             raise ValueError("Matrix 1 and 2 must be the same shape")
 
-        if not mat1.shape[0] == mat2.shape[1]:
+        if not mat1.shape[0] == mat1.shape[1]:
             raise ValueError("Matrices must be square")
 
         size = mat1.shape[0]
