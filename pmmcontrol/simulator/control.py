@@ -59,11 +59,11 @@ class Control(Detector):
         if self.curr_sign == 'negative':
             set_current = -set_current
 
-        max_current = round(self.max_voltage /
+        max_current = round((2*self.max_voltage) /
                             self.__chooseResistor(self.curr_isPrimary), 4)
 
         if set_current > max_current:
-            raise ValueError('The maximum current allowed on this row is ' +
+            raise ValueError('The maximum current allowed on any magnet is ' +
                              str(max_current * 1000)[:5] + ' mA')
 
         # to achieve I current on current magnet, we send I/2 down the row and the column
@@ -78,6 +78,8 @@ class Control(Detector):
             for col in range(self.cols):
                 if col != self.curr_column:
                     self.setColCurrent(-set_current/6, col)
+
+        self.updateRes()
 
         return True
 
@@ -101,11 +103,13 @@ class Control(Detector):
         current_list = np.append(current_list, 0)
 
         # call setCurrent() first to allow updateCurrent()
+
+        print("Resetting...")
         self.setCurrent(max_current)
         for current in 1000 * current_list:
-            print("Setting current to: ", current)
             self.setCurrent(current)
-            sleep(0.1)
+            sleep(.1)
+        print("Reset complete.")
 
         return True
 

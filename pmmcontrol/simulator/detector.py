@@ -20,13 +20,9 @@ class Detector():
 
     def setRowCurrent(self, I, row):
         self.row_currents[row] = I
-        for col in range(self.cols):
-            self.__updateRes(row, col)
 
     def setColCurrent(self, I, col):
         self.col_currents[col] = I
-        for row in range(self.rows):
-            self.__updateRes(row, col)
 
     def resPlot(self, row, col):
         self.resArray[row, col].plot()
@@ -34,11 +30,13 @@ class Detector():
     def displayCurrents(self):
         return False
 
-    def __updateRes(self, row, col):
-        self.resArray[row, col].setCurrent(self.row_currents[row] + self.col_currents[col])
+    def updateRes(self):
+        for row in range(self.rows):
+            for col in range(self.cols):
+                self.resArray[row, col].setCurrent(self.row_currents[row] + self.col_currents[col])
 
 class Resonator(Hysteresis):
-    def __init__(self, baseFreq, N=10, satCurrent=0.020, satMag=1401.4, remanence=949.36):
+    def __init__(self, baseFreq, N=100, satCurrent=0.020, satMag=1401.4, remanence=949.36):
 
         #Resonator properties
         self.__baseFreq = baseFreq
@@ -65,11 +63,6 @@ class Resonator(Hysteresis):
 
         Hysteresis.__init__(self, self.__satField, self.__satMag, self.__remanence, self.__size, 'Applied Field (T)',
                             'Magnetization (A/m)')
-
-    @property
-    def freq(self):
-        return self.__freq
-
 
     def setCurrent(self, I):
 
