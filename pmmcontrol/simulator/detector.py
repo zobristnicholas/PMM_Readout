@@ -13,10 +13,15 @@ class Detector():
         self.row_currents = np.zeros(rows)
         self.col_currents = np.zeros(cols)
 
-        #arbitrary matrix of evenly spaced frequencies
+        # arbitrary matrix of evenly spaced frequencies
         self.fstart = 1 #MHz
         self.fstop = 3 #MHz
         self.baseFrequencies = np.linspace(self.fstart, self.fstop, self.rows*self.cols).reshape(self.rows, self.cols)
+
+        # scatter base frequencies
+        for idx, freq in enumerate(self.baseFrequencies):
+            self.baseFrequencies[idx] = freq + (randrange(-1000, 1000)/1000) * 1.1 * ((self.fstop - self.fstart) /
+                                                    (self.rows*self.cols -1))
 
         self.resArray = np.empty((self.rows, self.cols), dtype=object)
         self.resArray[:,:] = np.vectorize(Resonator)(self.baseFrequencies)
