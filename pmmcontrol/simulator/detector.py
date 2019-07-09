@@ -1,5 +1,7 @@
 from pmmcontrol.simulator.hysteresis import Hysteresis
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 class Detector():
     def __init__(self, rows=9, cols=10):
@@ -33,6 +35,41 @@ class Detector():
         for row in range(self.rows):
             for col in range(self.cols):
                 self.resArray[row, col].setCurrent(self.row_currents[row] + self.col_currents[col])
+
+    def plotState(self, param):
+        labels = np.array([])
+        frequencies = np.array([])
+        for idx, res in enumerate(self.resArray.flatten()):
+            labels = np.append(labels, idx)
+            frequencies = np.append(frequencies, res.state[param])
+
+        fig = plt.figure(figsize=(8, 1))
+        ax = fig.add_subplot(1, 1, 1)
+
+        ax.spines['right'].set_color('none')
+        ax.spines['left'].set_color('none')
+        ax.yaxis.set_major_locator(ticker.NullLocator())
+        ax.spines['top'].set_color('none')
+        ax.xaxis.set_ticks_position('bottom')
+        ax.tick_params(which='major', width=1.00)
+        ax.tick_params(which='major', length=5)
+        ax.tick_params(which='minor', width=0.75)
+        ax.tick_params(which='minor', length=2.5)
+        ax.set_xlim(self.fstart - 0.5, self.fstop + 0.5)
+        ax.set_ylim(0, 1)
+        ax.patch.set_alpha(0.0)
+
+        ax.xaxis.set_major_locator(ticker.AutoLocator())
+        ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
+
+        ax.plot(frequencies, np.zeros(frequencies.size), '-bD', linestyle='')
+
+        ax.set_xlabel('Frequency (MHz)')
+
+        plt.show()
+
+        return True
+
 
 class Resonator(Hysteresis):
     def __init__(self, baseFreq, N=200, satField=25, satMag=0.5,
