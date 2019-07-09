@@ -78,7 +78,7 @@ class Hysteresis():
             for i in range(xScaled, self.__x):
                 self.increment('down')
 
-        return self.__y
+        return round(self.__y, 7)
 
     def increment(self, direction):
         '''
