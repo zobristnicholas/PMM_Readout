@@ -36,7 +36,8 @@ class Detector():
                 self.resArray[row, col].setCurrent(self.row_currents[row] + self.col_currents[col])
 
 class Resonator(Hysteresis):
-    def __init__(self, baseFreq, N=100, satCurrent=0.020, satMag=1401.4, remanence=949.36):
+    def __init__(self, baseFreq, N=100, satCurrent=0.020, satMag=1401.4,
+                 remanence=949.36, coercitivity=0.0007):
 
         #Resonator properties
         self.__baseFreq = baseFreq
@@ -47,6 +48,7 @@ class Resonator(Hysteresis):
         self.__satCurrent = satCurrent
         self.__satMag = satMag
         self.__remanence = remanence
+        self.__coercitivity = coercitivity
         self.__satField = self.__loopField(self.__satCurrent, self.__loopRadius, self.__distLoopMag,
                                                 self.__nLoops)
 
@@ -60,9 +62,10 @@ class Resonator(Hysteresis):
 
         self.__satField = self.__loopField(self.__satCurrent, self.__loopRadius, self.__distLoopMag,
                                                 self.__nLoops)
+        print("Satfield: ", self.__satField)
 
-        Hysteresis.__init__(self, self.__satField, self.__satMag, self.__remanence, self.__size, 'Applied Field (T)',
-                            'Magnetization (A/m)')
+        Hysteresis.__init__(self, self.__satField, self.__satMag, self.__coercitivity,
+                            self.__remanence, self.__size, 'Applied Field (T)', 'Magnetization (A/m)')
 
     def setCurrent(self, I):
 

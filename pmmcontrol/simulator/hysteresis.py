@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class Hysteresis():
-    def __init__(self, xSaturation, ySaturation, yRemanence, N=10, xParam='', yParam=''):
+    def __init__(self, xSaturation, ySaturation, xCoercivity, yRemanence=0, N=10, xParam='', yParam=''):
 
         if not isinstance(N, int):
             raise ValueError("Matrix size must be an integer value")
@@ -13,8 +13,18 @@ class Hysteresis():
         if not ySaturation > yRemanence:
             raise ValueError("The y-intercept (remanence) must be lower than the ySaturation value")
 
+        if not xSaturation > xCoercivity:
+            raise ValueError("The x-intercept (coercitivity) must be lower than the xSaturation value")
+
         # store size of matrix
         self.__size = N
+
+        self.__xSaturation = xSaturation
+        self.__ySaturation = ySaturation
+        self.__yRemanence = yRemanence
+        self.__xCoercitivity = xCoercivity
+
+        self.__xScale = (self.__size / 2) / self.__xSaturation
 
         # configure plotting details
         self.__xLabel = xParam
@@ -24,17 +34,19 @@ class Hysteresis():
         self.__relay = np.zeros((N,N))
 
         # matrix of weights to be applied to each relay
-        self.__weights = np.ones((N,N))
+        self.__weights = np.zeros((N,N))
 
+        # simple weight fill
+        self.__simpleWeightFill()
+
+        # matrix of weights to be applied to each relay
+        #self.__weights = np.ones((N,N))
         # fill the weights matrix to adjust behavior of hysteresis
-        self.__diagFill(self.__weights)
+        #self.__diagFill(self.__weights)
+        # scale weight matrix according to input parameters
+        #self.__weightScale()
 
-        self.__xSaturation = xSaturation
-        self.__ySaturation = ySaturation
-        self.__yRemanence = yRemanence
-
-        # Scale according to input parameters
-        self.__parameterScale()
+        # scale x values according to the saturation parameter
 
         # scaling of plot window
         self.__yMax = self.__sumHalf(self.__weights, np.ones((N,N)))
@@ -126,17 +138,31 @@ class Hysteresis():
         xlim = ((self.__size / self.__xScale) / 1.7)
         ylim = self.__yMax * 1.1
 
-        ax.plot(self.__xValues, self.__yValues)
+
+        ax.plot(self.__xValues, self.__yValues, '-bD', markevery=[self.__xValues.size - 1])
         ax.set_xlim(-xlim , xlim)
         ax.set_ylim(-ylim, ylim)
         ax.set_xlabel(self.__xLabel)
         ax.set_ylabel(self.__yLabel)
 
+        plt.grid()
         plt.show()
 
         return True
 
-    def __parameterScale(self):
+    def __simpleWeightFill(self):
+        width = int(self.__xCoercitivity * self.__xScale) * 2
+        alpha2 = int(self.__xSaturation * self.__xScale)
+        alpha1 = width - alpha2
+        ms = self.__ySaturation
+
+        for alpha in range(alpha1+1, alpha2+1):
+            for beta in range(-self.__size//2, self.__size//2 + 1):
+                if (alpha - beta - (width + 1) == 0):
+                    self.__weights[self.__size//2 - alpha, beta + self.__size//2] = ms / (alpha2 - alpha1)
+
+
+    def __weightScale(self):
         # scale weights according to the remanence parameter
         remScale = self.__yRemanence / self.__weights[0:self.__size // 2, 0:self.__size // 2].sum()
         self.__weights = self.__weights * remScale
@@ -150,9 +176,6 @@ class Hysteresis():
 
         self.__weights[0:self.__size // 2, self.__size//2: self.__size] = satAdjust
         self.__weights[self.__size//2: self.__size, 0:self.__size // 2] = satAdjust
-
-        # scale x values according to the saturation parameter
-        self.__xScale = (self.__size / 2) / self.__xSaturation
 
         return True
 
@@ -168,9 +191,12 @@ class Hysteresis():
         size = mat.shape[0]
 
         # currently distributed as a gradient that decreases away from the center diagonal
+
+        centerVal = 1
+
         for n in range(0, size):
-            fill = 1-(1/(size - 1) * n)
-            fillArr = np.ones(size - n) * fill
+            fill = centerVal-(centerVal/(size - 1) * n)
+            fillArr = np.linspace(0, fill, size - n)
             np.fill_diagonal(mat[n:], fillArr)
             np.fill_diagonal(mat[:,n:], fillArr)
 
@@ -222,3 +248,11 @@ class Hysteresis():
             print(mat[row][:(size-row)])
 
         return True
+
+    @property
+    def weights(self):
+        self.__printHalf(self.__weights)
+
+    @property
+    def relays(self):
+        self.__printHalf(self.__relay)
