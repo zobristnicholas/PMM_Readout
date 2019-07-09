@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
+from random import randrange
+
 class Detector():
     def __init__(self, rows=9, cols=10):
         self.rows = rows
@@ -39,8 +41,8 @@ class Detector():
     def plotState(self, param):
         labels = np.array([])
         frequencies = np.array([])
-        for idx, res in enumerate(self.resArray.flatten()):
-            labels = np.append(labels, idx)
+        for idx, res in np.ndenumerate(self.resArray):
+            labels = np.append(labels, str(idx))
             frequencies = np.append(frequencies, res.state[param])
 
         fig = plt.figure(figsize=(8, 1))
@@ -63,6 +65,10 @@ class Detector():
         ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
 
         ax.plot(frequencies, np.zeros(frequencies.size), '-bD', linestyle='')
+
+        for idx, label in enumerate(labels):
+            ax.annotate(label, xy=(frequencies[idx], 0),
+                        xytext=(0,10), textcoords='offset pixels')
 
         ax.set_xlabel('Frequency (MHz)')
 
@@ -128,7 +134,7 @@ class Resonator(Hysteresis):
 
     def __fieldToDeltaFreq(self, B): #Tesla -> MHz
         slope = -(.08)/(0.0003**2)
-        return slope * (B + .00015)**2
+        return slope * (B)**2
 
     @property
     def state(self):
