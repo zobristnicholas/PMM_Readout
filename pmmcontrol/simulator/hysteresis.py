@@ -35,9 +35,10 @@ class Hysteresis():
 
         # matrix of weights to be applied to each relay
         self.__weights = np.zeros((N,N))
-
         # simple weight fill
         self.__simpleWeightFill()
+
+        # OR
 
         # matrix of weights to be applied to each relay
         #self.__weights = np.ones((N,N))
@@ -156,10 +157,10 @@ class Hysteresis():
         alpha1 = width - alpha2
         ms = self.__ySaturation
 
-        for alpha in range(alpha1+1, alpha2+1):
+        for alpha in range(alpha1, alpha2):
             for beta in range(-self.__size//2, self.__size//2 + 1):
-                if (alpha - beta - (width + 1) == 0):
-                    self.__weights[self.__size//2 - alpha, beta + self.__size//2] = ms / (alpha2 - alpha1)
+                if (alpha - beta - width == 0):
+                    self.__weights[self.__size//2 - alpha - 1, beta + self.__size//2] = ms / (alpha2 - alpha1)
 
 
     def __weightScale(self):
