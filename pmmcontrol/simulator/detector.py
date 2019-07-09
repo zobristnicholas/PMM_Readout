@@ -20,7 +20,7 @@ class Detector():
 
         # scatter base frequencies
         for idx, freq in enumerate(self.baseFrequencies):
-            self.baseFrequencies[idx] = freq + (randrange(-1000, 1000)/1000) * 1.1 * ((self.fstop - self.fstart) /
+            self.baseFrequencies[idx] = freq + (randrange(-1000, 1000)/1000) * 2 * ((self.fstop - self.fstart) /
                                                     (self.rows*self.cols -1))
 
         self.resArray = np.empty((self.rows, self.cols), dtype=object)
@@ -43,12 +43,21 @@ class Detector():
             for col in range(self.cols):
                 self.resArray[row, col].setCurrent(self.row_currents[row] + self.col_currents[col])
 
-    def plotState(self, param):
-        labels = np.array([])
-        frequencies = np.array([])
+    def getState(self, param):
+        # labels = np.array([])
+        data = np.array([])
         for idx, res in np.ndenumerate(self.resArray):
-            labels = np.append(labels, str(idx))
-            frequencies = np.append(frequencies, res.state[param])
+            # labels = np.append(labels, str(idx))
+            data = np.append(data, res.state[param])
+
+        return data
+
+    def plotState(self, param):
+        #labels = np.array([])
+        data = np.array([])
+        for idx, res in np.ndenumerate(self.resArray):
+            #labels = np.append(labels, str(idx))
+            data = np.append(data, res.state[param])
 
         fig = plt.figure(figsize=(8, 1))
         ax = fig.add_subplot(1, 1, 1)
@@ -69,11 +78,11 @@ class Detector():
         ax.xaxis.set_major_locator(ticker.AutoLocator())
         ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
 
-        ax.plot(frequencies, np.zeros(frequencies.size), '-bD', linestyle='')
+        ax.plot(data, np.zeros(data.size), '-bD', linestyle='')
 
-        for idx, label in enumerate(labels):
-            ax.annotate(label, xy=(frequencies[idx], 0),
-                        xytext=(0,10), textcoords='offset pixels')
+        #for idx, label in enumerate(labels):
+        #    ax.annotate(label, xy=(frequencies[idx], 0),
+        #                xytext=(0,10), textcoords='offset pixels')
 
         ax.set_xlabel('Frequency (MHz)')
 
