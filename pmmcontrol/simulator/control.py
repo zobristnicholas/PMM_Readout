@@ -161,6 +161,12 @@ class Control(Detector):
 
         self.resPlot(self.curr_row, self.curr_column)
 
+    def showState(self):
+        return self.resArray[self.curr_row, self.curr_column].state
+
+    def showProperties(self):
+        return self.resArray[self.curr_row, self.curr_column].properties
+
     def __currentToVoltage(self, current):
         '''
         Converts the requested current into a voltage required to be output by the DAC.
@@ -176,3 +182,6 @@ class Control(Detector):
             return self.R_primary
         if not primary:
             return self.R_auxiliary
+
+    def __fieldToCurrent(self, B): #G -> Amp
+        return (0.0025) * (B / 10)
