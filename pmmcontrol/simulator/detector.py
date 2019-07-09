@@ -163,7 +163,7 @@ class Resonator(Hysteresis):
 
     @property
     def properties(self):
-        propertyData = {'BaseFrequnecy': self.__baseFreq,
+        propertyData = {'BaseFrequency': self.__baseFreq,
                       'SatField': self.__satField,
                       'SatMagnetization': self.__satMag,
                       'Remanence': self.__remanence,
