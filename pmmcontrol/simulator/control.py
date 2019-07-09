@@ -142,10 +142,35 @@ class Control(Detector):
 
         print("Resetting...")
         self.setCurrent(sat_current * 1000)
-        self.showHistory()
         self.setCurrent(-co_current * 1000)
         self.setCurrent(0)
         print("Reset complete.")
+
+        return True
+
+    def resId(self):
+
+        posList = np.array([])
+
+        for row in range(self.rows):
+            for col in range (self.columns):
+                self.selectMagnet(row, col, True)
+
+                self.plotState('Frequency')
+
+                initial_freq = self.getState('Frequency')
+                sat_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['SatField'])
+                co_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['Coercivity'])
+                self.setCurrent(1000* (co_current + (sat_current - co_current)/4))
+                final_freq = self.getState('Frequency')
+
+                diff = abs(np.subtract(final_freq, initial_freq))
+
+                posList = np.append(posList, np.argmax(diff))
+
+        posList = posList.reshape(self.rows, self.columns)
+
+        print(posList)
 
         return True
 
