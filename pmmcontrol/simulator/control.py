@@ -79,6 +79,17 @@ class Control(Detector):
                 if col != self.curr_column:
                     self.setColCurrent(-set_current/6, col)
 
+        # simulate turning on the DAC after setting all pins
+        self.updateRes()
+
+        # allow enough time for full magnetization
+        sleep(.5)
+
+        # simulate turning off the DAC
+        for row in range(self.rows):
+            self.setRowCurrent(0, row)
+        for col in range(self.cols):
+            self.setColCurrent(0, col)
         self.updateRes()
 
         return True
