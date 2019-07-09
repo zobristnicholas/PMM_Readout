@@ -124,6 +124,32 @@ class Control(Detector):
 
         return True
 
+    def resetMagnetRect(self):
+        '''
+        Duplicates resetMagnet() for rectangular model
+        '''
+
+        if not hasattr(self, 'curr_sign'):
+            raise AttributeError("Some attributes have not been set. " +
+                                 " Run 'selectMagnet()' first")
+        if self.curr_isArrayMode:
+            raise ValueError("Can not reset magnet that has been selected in array mode. Please reselect magnet.")
+
+        sat_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['SatField'])
+        co_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['Coercivity'])
+
+        print("Saturation Current:", sat_current)
+        print("Coercivity Current:", co_current)
+
+        print("Resetting...")
+        self.setCurrent(sat_current * 1000)
+        self.showHistory()
+        self.setCurrent(-co_current * 1000)
+        self.setCurrent(0)
+        print("Reset complete.")
+
+        return True
+
     def showHistory(self):
         '''
         Shows plot of the history of the selected magnet
