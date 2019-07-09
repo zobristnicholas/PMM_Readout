@@ -6,8 +6,8 @@ class Control(Detector):
 
     def __init__(self):
         # define number of rows and columns
-        self.rows = 9
-        self.columns = 10
+        self.rows = 3
+        self.columns = 3
 
         # define resistor values
         self.R_primary = 620
@@ -17,7 +17,7 @@ class Control(Detector):
 
         Detector.__init__(self, self.rows, self.columns)
 
-    def selectMagnet(self, row, column, isPrimary=True, isArrayMode=False, sign='positive'):
+    def selectMagnet(self, row, column, isArrayMode=False, isPrimary=True, sign='positive'):
 
         # check inputs
         if sign != 'positive' and sign != 'negative':
@@ -108,8 +108,7 @@ class Control(Detector):
 
         # set oscillating and exponentially decaying current through (row, column) magnet
         tt = np.arange(0, 70)
-        max_current = round(self.max_voltage /
-                            self.__chooseResistor(self.curr_isPrimary), 4)
+        max_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['SatField'])
         current_list = np.exp(-tt / 20.0) * np.cos(tt / 3.0) * max_current
         current_list = np.append(current_list, 0)
 
@@ -119,7 +118,7 @@ class Control(Detector):
         self.setCurrent(max_current)
         for current in 1000 * current_list:
             self.setCurrent(current)
-            sleep(.1)
+            #sleep(.1)
         print("Reset complete.")
 
         return True
