@@ -20,7 +20,7 @@ class Detector():
 
         # scatter base frequencies
         for idx, freq in enumerate(self.baseFrequencies):
-            self.baseFrequencies[idx] = freq + (randrange(-1000, 1000)/1000) * 2 * ((self.fstop - self.fstart) /
+            self.baseFrequencies[idx] = freq + (randrange(-1000, 1000)/1000) * 3 * ((self.fstop - self.fstart) /
                                                     (self.rows*self.cols -1))
 
         self.resArray = np.empty((self.rows, self.cols), dtype=object)
@@ -50,6 +50,9 @@ class Detector():
             # labels = np.append(labels, str(idx))
             data = np.append(data, res.state[param])
 
+        # eliminate ordering to simulate feedline output
+        data = np.sort(data)
+
         return data
 
     def plotState(self, param):
@@ -71,7 +74,7 @@ class Detector():
         ax.tick_params(which='major', length=5)
         ax.tick_params(which='minor', width=0.75)
         ax.tick_params(which='minor', length=2.5)
-        ax.set_xlim(self.fstart - 0.5, self.fstop + 0.5)
+        ax.set_xlim(self.fstart - 1, self.fstop + 1)
         ax.set_ylim(0, 1)
         ax.patch.set_alpha(0.0)
 
