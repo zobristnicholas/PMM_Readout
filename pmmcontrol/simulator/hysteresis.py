@@ -24,6 +24,7 @@ class Hysteresis():
         self.__yRemanence = yRemanence
         self.__xCoercitivity = xCoercivity
 
+        # scale x values according to the saturation parameter
         self.__xScale = (self.__size / 2) / self.__xSaturation
 
         # configure plotting details
@@ -37,17 +38,18 @@ class Hysteresis():
         self.__weights = np.zeros((N,N))
         # simple weight fill
         self.__simpleWeightFill()
-
+        #
         # OR
-
+        #
         # matrix of weights to be applied to each relay
         #self.__weights = np.ones((N,N))
         # fill the weights matrix to adjust behavior of hysteresis
         #self.__diagFill(self.__weights)
         # scale weight matrix according to input parameters
-        #self.__weightScale()
-
-        # scale x values according to the saturation parameter
+        #self.__weightParamScale()
+        # OR
+        #self.__weights = self.__weights * (self.__ySaturation /
+        #                                   self.__sumHalf(self.__weights, np.ones((N,N))))
 
         # scaling of plot window
         self.__yMax = self.__sumHalf(self.__weights, np.ones((N,N)))
@@ -163,7 +165,7 @@ class Hysteresis():
                     self.__weights[self.__size//2 - alpha - 1, beta + self.__size//2] = ms / (alpha2 - alpha1)
 
 
-    def __weightScale(self):
+    def __weightParamScale(self):
         # scale weights according to the remanence parameter
         remScale = self.__yRemanence / self.__weights[0:self.__size // 2, 0:self.__size // 2].sum()
         self.__weights = self.__weights * remScale
