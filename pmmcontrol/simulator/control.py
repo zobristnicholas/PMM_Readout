@@ -66,6 +66,15 @@ class Control(Detector):
             raise ValueError('The maximum current allowed on any magnet is ' +
                              str(max_current * 1000)[:5] + ' mA')
 
+        # set all rows and columns to zero current
+        for row in range(self.rows):
+            self.setRowCurrent(0, row)
+        for col in range(self.cols):
+            self.setColCurrent(0, col)
+
+        # simulate turning off the DAC before adjusting pins
+        self.updateRes()
+
         # to achieve I current on current magnet, we send I/2 down the row and the column
         self.setRowCurrent(set_current/2, self.curr_row)
         self.setColCurrent(set_current/2, self.curr_column)
@@ -80,16 +89,6 @@ class Control(Detector):
                     self.setColCurrent(-set_current/6, col)
 
         # simulate turning on the DAC after setting all pins
-        self.updateRes()
-
-        # allow enough time for full magnetization
-        sleep(.5)
-
-        # simulate turning off the DAC
-        for row in range(self.rows):
-            self.setRowCurrent(0, row)
-        for col in range(self.cols):
-            self.setColCurrent(0, col)
         self.updateRes()
 
         return True
@@ -147,6 +146,9 @@ class Control(Detector):
         print("Reset complete.")
 
         return True
+
+    def resetAllMagnet(self):
+        raise NotImplementedError
 
     def resId(self):
 
