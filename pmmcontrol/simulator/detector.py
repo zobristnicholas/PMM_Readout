@@ -26,6 +26,10 @@ class Detector():
         self.resArray = np.empty((self.rows, self.cols), dtype=object)
         self.resArray[:,:] = np.vectorize(Resonator)(self.baseFrequencies)
 
+    #
+    # controller outputs
+    #
+
     def setRowCurrent(self, I, row):
         self.row_currents[row] = I
 
@@ -43,11 +47,16 @@ class Detector():
             for col in range(self.cols):
                 self.resArray[row, col].setCurrent(self.row_currents[row] + self.col_currents[col])
 
+    #
+    # testing functions
+    #
+
     def getState(self, param):
-        # labels = np.array([])
+        '''
+        get array of any state variable
+        '''
         data = np.array([])
         for idx, res in np.ndenumerate(self.resArray):
-            # labels = np.append(labels, str(idx))
             data = np.append(data, res.state[param])
 
         # eliminate ordering to simulate feedline output
@@ -56,13 +65,13 @@ class Detector():
         return data
 
     def plotState(self, param):
-        #labels = np.array([])
+        labels = np.array([]) #FOR TESTING PURPOSES - labels will not be known in reality
         data = np.array([])
         for idx, res in np.ndenumerate(self.resArray):
-            #labels = np.append(labels, str(idx))
+            labels = np.append(labels, str(idx))
             data = np.append(data, res.state[param])
 
-        fig = plt.figure(figsize=(8, 1))
+        fig = plt.figure(figsize=(8, 1.5))
         ax = fig.add_subplot(1, 1, 1)
 
         ax.spines['right'].set_color('none')
@@ -74,7 +83,7 @@ class Detector():
         ax.tick_params(which='major', length=5)
         ax.tick_params(which='minor', width=0.75)
         ax.tick_params(which='minor', length=2.5)
-        ax.set_xlim(self.fstart - 1, self.fstop + 1)
+        ax.set_xlim(int(np.amin(data)), int(np.amax(data))+1)
         ax.set_ylim(0, 1)
         ax.patch.set_alpha(0.0)
 
@@ -83,9 +92,10 @@ class Detector():
 
         ax.plot(data, np.zeros(data.size), '-bD', linestyle='')
 
-        #for idx, label in enumerate(labels):
-        #    ax.annotate(label, xy=(frequencies[idx], 0),
-        #                xytext=(0,10), textcoords='offset pixels')
+        for idx, label in enumerate(labels):
+            ax.annotate(label, xy=(data[idx], 0),
+                        xytext=(0,10), textcoords='offset pixels',
+                        rotation=90, ha='left', va='bottom')
 
         ax.set_xlabel('Frequency (MHz)')
 
@@ -93,19 +103,30 @@ class Detector():
 
         return True
 
+    #
+    # measurable properties
+    #
+
+    @property
+    def frequencies(self):
+        '''
+        simulates feedline readout
+        '''
+        return self.getState('Frequency')
+
 
 class Resonator(Hysteresis):
     def __init__(self, baseFreq, N=200, satField=25, satMag=0.5,
                  remanence=0, coercivity=20):
 
-        #Resonator properties
+        # Resonator properties
         self.__baseFreq = baseFreq
         self.__satMag = satMag
         self.__remanence = remanence
         self.__coercivity = coercivity
         self.__satField = satField
 
-        #State variables
+        # State variables
         self.__current = 0
         self.__B_ext = 0
         self.__mag = 0
