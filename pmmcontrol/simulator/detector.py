@@ -51,7 +51,7 @@ class Detector():
     # testing functions
     #
 
-    def getState(self, param):
+    def getState(self, param, ordered=True):
         '''
         get array of any state variable
         '''
@@ -60,11 +60,12 @@ class Detector():
             data = np.append(data, res.state[param])
 
         # eliminate ordering to simulate feedline output
-        data = np.sort(data)
+        if ordered:
+            data = np.sort(data)
 
         return data
 
-    def plotState(self, param):
+    def plotState(self, param, title=''):
         labels = np.array([]) #FOR TESTING PURPOSES - labels will not be known in reality
         data = np.array([])
         for idx, res in np.ndenumerate(self.resArray):
@@ -98,6 +99,7 @@ class Detector():
                         rotation=90, ha='left', va='bottom')
 
         ax.set_xlabel('Frequency (MHz)')
+        ax.set_title(title)
 
         plt.show()
 
