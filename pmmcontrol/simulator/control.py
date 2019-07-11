@@ -6,8 +6,8 @@ class Control(Detector):
 
     def __init__(self):
         # define number of rows and columns
-        self.rows = 3
-        self.columns = 3
+        self.rows = 9
+        self.columns = 10
 
         # define resistor values
         self.R_primary = 620
@@ -303,14 +303,9 @@ class Control(Detector):
     # Utility functions
     #
 
-    # DOESNT WORK
     def testId(self):
-        pass1 = 0
-        pass2 = 0
-
-        tSum1 = 0
-        tSum2 = 0
-
+        pass1, pass2 = 0, 0
+        tSum1, tSum2 = 0, 0
         trials = 5
 
         for n in range(trials):
@@ -321,13 +316,9 @@ class Control(Detector):
             self.plotState('Frequency', 'Trial #' + str(n+1))
 
             freq = self.getState('Frequency', False)
-            print(freq)
-            realOrder = np.array([])
-            for f in enumerate(freq):
-                idx = np.argmin(freq)
-                realOrder = np.append(realOrder, idx)
-                freq[idx] = 10000
-            realOrder = realOrder.reshape(self.rows, self.columns)
+            sortIdx = np.argsort(freq)
+            freqIdx = np.argsort(sortIdx)
+            realOrder = freqIdx.reshape(self.rows, self.columns)
 
             print("Looking for...")
             print(realOrder)
@@ -337,6 +328,7 @@ class Control(Detector):
             m1 = self.resIdBasic()
             end1 = time()
             elapsed1 = end1-start1
+
             if np.array_equal(realOrder, m1):
                 print("Good! \n")
                 pass1 = pass1 + 1
@@ -347,6 +339,7 @@ class Control(Detector):
             m2 = self.resId()
             end2 = time()
             elapsed2 = end2-start2
+
             if np.array_equal(realOrder, m2):
                 print("Good! \n")
                 pass2 = pass2 + 1
@@ -358,8 +351,8 @@ class Control(Detector):
 
             print()
 
-        print("Successes for #1: ", pass1)
-        print("Successes for #1: ", pass2)
+        print("Successes for #1: " + str(pass1) + " out of " + str(trials))
+        print("Successes for #2: " + str(pass2) + " out of " + str(trials))
         print("Average Time #1: ", tSum1/trials)
         print("Average Time #2: ", tSum2/trials)
 
