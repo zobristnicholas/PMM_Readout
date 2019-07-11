@@ -1,6 +1,6 @@
 from pmmcontrol.simulator.detector import Detector
 import numpy as np
-from time import sleep
+from time import time, sleep
 
 class Control(Detector):
 
@@ -12,6 +12,9 @@ class Control(Detector):
         # define resistor values
         self.R_primary = 620
         self.R_auxiliary = 2400
+
+        #The furthest we expect to be able to shift frequency
+        self.__maxFreqShift = 0.2 #MHz
 
         self.max_voltage = 14
 
@@ -130,27 +133,33 @@ class Control(Detector):
         if not hasattr(self, 'curr_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if self.curr_isArrayMode:
-            raise ValueError("Can not reset magnet that has been selected in array mode. Please reselect magnet.")
+        #if self.curr_isArrayMode:
+        #    raise ValueError("Can not reset magnet that has been selected in array mode. Please reselect magnet.")
 
         sat_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['SatField'])
         co_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['Coercivity'])
 
-        print("Saturation Current:", sat_current)
-        print("Coercivity Current:", co_current)
+        #print("Saturation Current:", sat_current)
+        #print("Coercivity Current:", co_current)
 
-        print("Resetting...")
+        #print("Resetting...")
         self.setCurrent(sat_current * 1000)
         self.setCurrent(-co_current * 1000)
         self.setCurrent(0)
-        print("Reset complete.")
+        #print("Reset complete.")
 
         return True
 
     def resetAllMagnet(self):
+
+        for row in range(self.rows):
+            for col in range(self.columns):
+                self.selectMagnet = None
+
         raise NotImplementedError
 
-    def resId(self):
+    # doesn't work for swapped resonators
+    def resIdBasic(self):
 
         posList = np.array([])
 
@@ -158,15 +167,15 @@ class Control(Detector):
             for col in range (self.columns):
                 self.selectMagnet(row, col, True)
 
-                self.plotState('Frequency')
-
-                initial_freq = self.getState('Frequency')
+                initial_freq = self.frequencies
                 sat_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['SatField'])
                 co_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['Coercivity'])
-                self.setCurrent(1000* (co_current + (sat_current - co_current)/4))
-                final_freq = self.getState('Frequency')
+                self.setCurrent(1000* (co_current + (sat_current - co_current)/2))
+                final_freq = self.frequencies
 
                 diff = abs(np.subtract(final_freq, initial_freq))
+                #self.plotState('Frequency')
+                self.resetMagnetRect()
 
                 posList = np.append(posList, np.argmax(diff))
 
@@ -174,7 +183,104 @@ class Control(Detector):
 
         print(posList)
 
-        return True
+        return posList
+
+    def resId(self):
+        deltaFreq = .0392
+        indexRange = 2
+
+        posList = np.zeros((self.rows, self.columns))
+
+        for row in range(self.rows):
+            for col in range(self.columns):
+
+                freqInitial = self.frequencies
+
+                indexGuess = (row * self.columns) + col
+
+                indexLower = indexGuess - indexRange
+                indexUpper = indexGuess + indexRange
+
+                if indexLower < 0:
+                    indexLower = 0
+                if indexUpper > len(freqInitial):
+                    indexUpper = len(freqInitial)
+
+                searchFreqInitial = freqInitial[indexLower:indexUpper]
+
+                sat_current = self.__fieldToCurrent(self.resArray[row, col].properties['SatField'])
+
+                self.selectMagnet(row, col, True)
+                self.setCurrent(sat_current * 1000)
+
+                searchFreqFinal = self.frequencies[indexLower:indexUpper]
+
+                size = len(searchFreqFinal)
+                searchFreqDiff = np.ones((size,size))
+
+                for finalIdx, finalFreq in enumerate(searchFreqFinal):
+                    for initialIdx, initialFreq in enumerate(searchFreqInitial):
+                        searchFreqDiff[initialIdx, finalIdx] = abs(finalFreq-initialFreq)
+
+
+                searchFreqId = np.round(np.abs(np.abs(searchFreqDiff) - deltaFreq),5)
+
+                searchFreqCoord = np.unravel_index(np.argmin(searchFreqId, axis=None),
+                                                   searchFreqId.shape)
+
+                idxInital = searchFreqCoord[0]
+                idxFinal = searchFreqCoord[1]
+
+                indexFound = idxInital + indexLower
+
+                posList[row, col] = indexFound
+
+                self.resetMagnetRect()
+
+        print(posList)
+
+        return posList
+
+
+
+
+
+
+    def testFreqShift(self, I):
+        '''
+        reset all magnets
+        find first isolated frequency (none in +/- max shift)
+        shift frequencies in the area and record the max and min shifts
+        These are the expected primary and secondary shifts for this current
+        return {"PrimaryShift": primaryShift, "SecondaryShift": secondaryShift}
+        '''
+
+        frequencies = self.frequencies
+        resIdx = None
+
+        # find suitable resonator to test
+        if len(frequencies) < 1:
+            raise ValueError("There are no resonators to test")
+        elif len(frequencies) == 1:
+            resIdx = 0
+        elif len(frequencies) == 2:
+            if (frequencies[1] - frequencies[0]) > self.__maxFreqShift:
+                resIdx = 0
+        else:
+            for idx in enumerate(frequencies[1,-1]):
+                if ((frequencies[idx+1] - frequencies[idx]) > self.__maxFreqShift) and \
+                        ((frequencies[idx+1] - frequencies[idx]) > self.__maxFreqShift):
+                    resIdx = idx
+                    break
+
+        if resIdx == None:
+            raise ValueError("There are no suitable resonators to test")
+
+        raise NotImplementedError
+
+    #
+    # Data retrieval
+    #
 
     def showHistory(self):
         '''
