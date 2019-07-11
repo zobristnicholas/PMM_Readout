@@ -161,7 +161,7 @@ class Control(Detector):
     # doesn't work for swapped resonators
     def resIdBasic(self):
 
-        posList = np.array([])
+        posList = np.array([], dtype='int')
 
         for row in range(self.rows):
             for col in range (self.columns):
@@ -170,8 +170,15 @@ class Control(Detector):
                 initial_freq = self.frequencies
                 sat_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['SatField'])
                 co_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['Coercivity'])
-                self.setCurrent(1000* (co_current + (sat_current - co_current)/2))
+                self.setCurrent(1000 * sat_current)
                 final_freq = self.frequencies
+
+                if len(final_freq) > len(initial_freq):
+                    print("Frequencies separated...")
+                elif len(final_freq) < len(initial_freq):
+                    print("Frequencies merged...")
+
+
 
                 diff = abs(np.subtract(final_freq, initial_freq))
                 #self.plotState('Frequency')
