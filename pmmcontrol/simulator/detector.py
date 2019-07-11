@@ -117,7 +117,7 @@ class Detector():
     @property
     def frequencies(self):
         '''
-        simulates feedline readout
+        simulates feedline measurement
         '''
 
         distinctionThresh = self.freqDistinctionThreshold #MHz
@@ -133,7 +133,10 @@ class Detector():
 
         freqArray_merged = np.delete(freqArray, duplicateFreqIdx)
 
-        return freqArray_merged
+        # disabled until resId can handle splitting and merging frequencies
+        #return freqArray_merged
+
+        return freqArray
 
 
 class Resonator(Hysteresis):
