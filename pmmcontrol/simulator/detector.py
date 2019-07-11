@@ -10,18 +10,22 @@ class Detector():
         self.rows = rows
         self.cols = cols
 
+        self.freqDistinctionThreshold = 0.005
+
         self.row_currents = np.zeros(rows)
         self.col_currents = np.zeros(cols)
 
         # arbitrary matrix of evenly spaced frequencies
         self.fstart = 1 #MHz
         self.fstop = 3 #MHz
-        self.baseFrequencies = np.linspace(self.fstart, self.fstop, self.rows*self.cols).reshape(self.rows, self.cols)
+        self.baseFrequencies = np.linspace(self.fstart, self.fstop, self.rows*self.cols)
 
         # scatter base frequencies
         for idx, freq in enumerate(self.baseFrequencies):
             self.baseFrequencies[idx] = freq + (randrange(-1000, 1000)/1000) * 3 * ((self.fstop - self.fstart) /
                                                     (self.rows*self.cols -1))
+
+        self.baseFrequencies = self.baseFrequencies.reshape(self.rows, self.cols)
 
         self.resArray = np.empty((self.rows, self.cols), dtype=object)
         self.resArray[:,:] = np.vectorize(Resonator)(self.baseFrequencies)
@@ -51,7 +55,7 @@ class Detector():
     # testing functions
     #
 
-    def getState(self, param, ordered=True):
+    def getState(self, param='Frequency', ordered=True):
         '''
         get array of any state variable
         '''
@@ -65,7 +69,8 @@ class Detector():
 
         return data
 
-    def plotState(self, param, title=''):
+
+    def plotState(self, param='Frequency', title=''):
         labels = np.array([]) #FOR TESTING PURPOSES - labels will not be known in reality
         data = np.array([])
         for idx, res in np.ndenumerate(self.resArray):
@@ -114,7 +119,21 @@ class Detector():
         '''
         simulates feedline readout
         '''
-        return self.getState('Frequency')
+
+        distinctionThresh = self.freqDistinctionThreshold #MHz
+
+        freqArray = self.getState('Frequency')
+        freqSeparation = np.ediff1d(freqArray)
+
+        duplicateFreqIdx = np.array([])
+
+        for idx, sep in enumerate(freqSeparation):
+            if sep < distinctionThresh:
+                duplicateFreqIdx = np.append(duplicateFreqIdx, idx)
+
+        freqArray_merged = np.delete(freqArray, duplicateFreqIdx)
+
+        return freqArray_merged
 
 
 class Resonator(Hysteresis):
