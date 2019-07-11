@@ -299,6 +299,70 @@ class Control(Detector):
     def showProperties(self):
         return self.resArray[self.curr_row, self.curr_column].properties
 
+    #
+    # Utility functions
+    #
+
+    # DOESNT WORK
+    def testId(self):
+        pass1 = 0
+        pass2 = 0
+
+        tSum1 = 0
+        tSum2 = 0
+
+        trials = 5
+
+        for n in range(trials):
+            print("Trial #", n+1)
+
+            Detector.__init__(self, self.rows, self.columns)
+
+            self.plotState('Frequency', 'Trial #' + str(n+1))
+
+            freq = self.getState('Frequency', False)
+            print(freq)
+            realOrder = np.array([])
+            for f in enumerate(freq):
+                idx = np.argmin(freq)
+                realOrder = np.append(realOrder, idx)
+                freq[idx] = 10000
+            realOrder = realOrder.reshape(self.rows, self.columns)
+
+            print("Looking for...")
+            print(realOrder)
+            print()
+
+            start1 = time()
+            m1 = self.resIdBasic()
+            end1 = time()
+            elapsed1 = end1-start1
+            if np.array_equal(realOrder, m1):
+                print("Good! \n")
+                pass1 = pass1 + 1
+            else:
+                print("Wrong! \n")
+
+            start2 = time()
+            m2 = self.resId()
+            end2 = time()
+            elapsed2 = end2-start2
+            if np.array_equal(realOrder, m2):
+                print("Good! \n")
+                pass2 = pass2 + 1
+            else:
+                print("Wrong! \n")
+
+            tSum1 = tSum1 + elapsed1
+            tSum2 = tSum2 + elapsed2
+
+            print()
+
+        print("Successes for #1: ", pass1)
+        print("Successes for #1: ", pass2)
+        print("Average Time #1: ", tSum1/trials)
+        print("Average Time #2: ", tSum2/trials)
+
     def __currentToVoltage(self, current):
         '''
         Converts the requested current into a voltage required to be output by the DAC.
