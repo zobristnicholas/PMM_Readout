@@ -187,9 +187,9 @@ class Control(Detector):
 
     def resId(self):
         deltaFreq = .0392
-        indexRange = 2
+        indexRange = 200
 
-        posList = np.zeros((self.rows, self.columns))
+        posList = np.ones((self.rows, self.columns), dtype='int') * -1
 
         for row in range(self.rows):
             for col in range(self.columns):
@@ -220,13 +220,13 @@ class Control(Detector):
 
                 for finalIdx, finalFreq in enumerate(searchFreqFinal):
                     for initialIdx, initialFreq in enumerate(searchFreqInitial):
-                        searchFreqDiff[initialIdx, finalIdx] = abs(finalFreq-initialFreq)
+                        searchFreqDiff[initialIdx, finalIdx] = finalFreq-initialFreq
 
 
-                searchFreqId = np.round(np.abs(np.abs(searchFreqDiff) - deltaFreq),5)
+                searchFreqErr = np.abs(np.round(searchFreqDiff + deltaFreq,5))
 
-                searchFreqCoord = np.unravel_index(np.argmin(searchFreqId, axis=None),
-                                                   searchFreqId.shape)
+                searchFreqCoord = np.unravel_index(np.argmin(searchFreqErr, axis=None),
+                                                   searchFreqErr.shape)
 
                 idxInital = searchFreqCoord[0]
                 idxFinal = searchFreqCoord[1]
@@ -267,7 +267,7 @@ class Control(Detector):
             if (frequencies[1] - frequencies[0]) > self.__maxFreqShift:
                 resIdx = 0
         else:
-            for idx in enumerate(frequencies[1,-1]):
+            for idx, f in enumerate(frequencies[1,-1]):
                 if ((frequencies[idx+1] - frequencies[idx]) > self.__maxFreqShift) and \
                         ((frequencies[idx+1] - frequencies[idx]) > self.__maxFreqShift):
                     resIdx = idx
