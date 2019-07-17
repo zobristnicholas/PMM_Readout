@@ -10,7 +10,7 @@ class Hysteresis():
         if not (N%2 == 0):
             raise ValueError("Matrix size must be even")
 
-        if not ySaturation > yRemanence:
+        if not ySaturation >= yRemanence:
             raise ValueError("The y-intercept (remanence) must be lower than the ySaturation value")
 
         if not xSaturation > xCoercivity:
