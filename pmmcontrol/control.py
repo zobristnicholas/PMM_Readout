@@ -11,7 +11,7 @@ class Control(Arduino):
     def __init__(self, port, baud_rate=115200, self_test=False):
         # define number of rows and columns
         self.rows = 9
-        self.columns = 10
+        self.cols = 10
 
         # define resistor values in np array
         self.R_row = 356 * np.ones(10)
@@ -25,17 +25,40 @@ class Control(Arduino):
 
         self.max_voltage = 4
 
+        # PIN CONFIGURATION
+
+        # COM line for each row/column
+        row_primary_COM = [1, 3, 5, 7, 9, 11, 13, 15, 17]
+        col_primary_COM = [19, 21, 23, 25, 27, 29, 31, 33, 35, 37]
+        row_auxiliary_COM = [2, 4, 6, 8, 10, 12, 14, 16, 18]
+        col_auxiliary_COM = [20, 22, 24, 26, 28, 30, 32, 34, 36, 38]
+        sign_COM = {'positive': 39, 'negative': 40}
+
+        # COMX: JX
+        headerMap = {1:1,   2:3,   3:5,   4:7,   5:9,   6:11,  7:13,  8:15,  9:17,  10:19,
+                     11:21, 12:23, 13:25, 14:27, 15:29, 16:31, 17:33, 18:35, 19:37, 20:39,
+                     21:2,  22:4,  23:6,  24:8,  25:10, 26:12, 27:14, 28:16, 29:18, 30:20,
+                     31:22, 32:24, 33:26, 34:28, 35:30, 36:32, 37:34, 38:36, 39:38, 40:40}
+
+        # JX: PINX
+        pinMap = {1:6,   2:7,   3:8,   4:9,   5:5,   6:3,   7:2,   8:4,   9:22,  10:23,
+                  11:24, 12:25, 13:26, 14:27, 15:28, 16:29, 17:30, 18:31, 19:32, 20:33,
+                  21:34, 22:35, 23:36, 24:37, 25:38, 26:39, 27:40, 28:41, 29:42, 30:43,
+                  31:44, 32:45, 33:46, 34:47, 35:48, 36:49, 37:50, 38:51, 39:52, 40:53}
+
         # pins for enabling row and column switches at large current (small resistance)
-        self.row_pins_primary = [53, 49, 45, 41, 37, 33, 29, 25, 9]
-        self.column_pins_primary= [5, 52, 48, 44, 40, 36, 32, 28, 24, 8]
+        self.row_primary_pins = [pinMap[headerMap[row]] for row in row_primary_COM]
+        self.col_primary_pins = [pinMap[headerMap[col]] for col in col_primary_COM]
+
         # pins for enabling row and column switches at small current (large resistance)
-        self.row_pins_auxiliary = [51, 47, 43, 39, 35, 31, 27, 23, 7]
-        self.column_pins_auxiliary = [3, 50, 46, 42, 38, 34, 30, 26, 22, 6]
+        self.row_auxiliary_pins = [pinMap[headerMap[row]] for row in row_auxiliary_COM]
+        self.col_auxiliary_pins = [pinMap[headerMap[col]] for col in col_auxiliary_COM]
 
         # pins for enabling positive or negative current
-        self.sign_pins = {'positive': 4, 'negative': 2}
+        self.sign_pins = {'positive': pinMap[headerMap[sign_COM['positive']]], 'negative': pinMap[headerMap[sign_COM['negative']]]}
+
         # all output pins enabled for use
-        self.enable_pins = self.row_pins_primary + self.row_pins_auxiliary + self.column_pins_primary + self.column_pins_auxiliary + list(self.sign_pins.values())
+        self.enable_pins = self.row_primary_pins + self.row_auxiliary_pins + self.col_primary_pins + self.col_auxiliary_pins + list(self.sign_pins.values())
 
         # analog pin for current sense
         self.sense_pin = 1
@@ -70,12 +93,12 @@ class Control(Arduino):
         self.null_current = self.readTotalCurrent()
 
         # results of testing each magnet at vmax and vmin
-        self.pos_test = np.zeros((self.rows, self.columns))
-        self.neg_test = np.zeros((self.rows, self.columns))
+        self.pos_test = np.zeros((self.rows, self.cols))
+        self.neg_test = np.zeros((self.rows, self.cols))
 
         # test each magnet positive and negative
         for row in range(0, self.rows):
-            for col in range(0, self.columns):
+            for col in range(0, self.cols):
                 # select magnet
                 print("Selecting magnet at coordinate {}, {}".format(row, col))
                 self.selectMagnet(row, col)
@@ -117,9 +140,9 @@ class Control(Arduino):
         if (not isinstance(row, int)) or row < 0 or row > self.rows - 1:
             raise ValueError("parameter 'row' must be an integer and between 0 and " +
                              str(self.rows - 1))
-        if (not isinstance(column, int)) or column < 0 or column > self.columns - 1:
+        if (not isinstance(column, int)) or column < 0 or column > self.cols - 1:
             raise ValueError("parameter 'column' must be an integer and between 0 and " +
-                             str(self.columns - 1))
+                             str(self.cols - 1))
 
         # record state
         self.current_row = row
@@ -186,25 +209,25 @@ class Control(Arduino):
 
         # enable switches (row, column) depending on whether the magnet is primary
         if self.current_isPrimary:
-            self.setHigh(self.column_pins_primary[self.current_column])
-            self.setHigh(self.row_pins_primary[self.current_row])
+            self.setHigh(self.col_primary_pins[self.current_column])
+            self.setHigh(self.row_primary_pins[self.current_row])
         else:
-            self.setHigh(self.column_pins_auxiliary[self.current_column])
-            self.setHigh(self.row_pins_auxiliary[self.current_row])
+            self.setHigh(self.col_auxiliary_pins[self.current_column])
+            self.setHigh(self.row_auxiliary_pins[self.current_row])
 
         self.setHigh(self.sign_pins[self.current_sign])
 
         # need to configure all other magnets if array mode is True
         if self.current_isArrayMode:
             # set all rows except selected to auxiliary function
-            for row_pin_auxiliary, row_pin_primary in zip(self.row_pins_auxiliary, self.row_pins_primary):
-                if row_pin_auxiliary != self.row_pins_auxiliary[self.current_row]:
+            for row_pin_auxiliary, row_pin_primary in zip(self.row_auxiliary_pins, self.row_primary_pins):
+                if row_pin_auxiliary != self.row_auxiliary_pins[self.current_row]:
                     self.setLow(row_pin_primary)
                     self.setHigh(row_pin_auxiliary)
 
             # set all columns except selected to auxiliary function
-            for column_pin_auxiliary, column_pin_primary in zip(self.column_pins_auxiliary, self.column_pins_primary):
-                if column_pin_auxiliary != self.column_pins_auxiliary[self.current_column]:
+            for column_pin_auxiliary, column_pin_primary in zip(self.col_auxiliary_pins, self.col_primary_pins):
+                if column_pin_auxiliary != self.col_auxiliary_pins[self.current_column]:
                     self.setLow(column_pin_primary)
                     self.setHigh(column_pin_auxiliary)
 
