@@ -10,14 +10,14 @@ class Detector():
         self.rows = rows
         self.cols = cols
 
-        self.freqDistinctionThreshold = 0.005
+        self.freqDistinctionThreshold = 0.01
 
         self.row_currents = np.zeros(rows)
         self.col_currents = np.zeros(cols)
 
         # arbitrary matrix of evenly spaced frequencies
-        self.fstart = 1 #MHz
-        self.fstop = 3 #MHz
+        self.fstart = 2 #MHz
+        self.fstop = 5 #MHz
         self.baseFrequencies = np.linspace(self.fstart, self.fstop, self.rows*self.cols)
 
         # scatter base frequencies
@@ -129,14 +129,19 @@ class Detector():
 
         for idx, sep in enumerate(freqSeparation):
             if sep < distinctionThresh:
+                # average out the two close-together values
+                freqArray[idx+1] = freqArray[idx+1] + 0.5 * freqSeparation[idx]
+
+                # mark first occurrence for deletion
                 duplicateFreqIdx = np.append(duplicateFreqIdx, idx)
 
         freqArray_merged = np.delete(freqArray, duplicateFreqIdx)
 
         # disabled until resId can handle splitting and merging frequencies
-        #return freqArray_merged
 
-        return freqArray
+        return freqArray_merged
+
+        #return freqArray
 
 
 class Resonator(Hysteresis):
@@ -146,8 +151,8 @@ class Resonator(Hysteresis):
         # Resonator properties
         self.__baseFreq = baseFreq
         self.__satMag = satMag
-        self.__remanence = remanence
         self.__coercivity = coercivity
+        self.__remanence = 0 # remanence not implemented
         self.__satField = satField
 
         # State variables
