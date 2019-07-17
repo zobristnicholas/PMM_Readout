@@ -1,13 +1,15 @@
 from pmmcontrol.simulator.detector import Detector
 import numpy as np
 from time import time, sleep
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 class Control(Detector):
 
     def __init__(self):
         # define number of rows and columns
-        self.rows = 9
-        self.columns = 10
+        self.rows = 3
+        self.columns = 4
 
         # define resistor values
         self.R_primary = 620
@@ -193,10 +195,14 @@ class Control(Detector):
         return posList
 
     def resId(self):
-        deltaFreq = .0392
+        deltaFreq_sat = .0392
+
+        # shift from saturation field to remanence field and see which frequency matches both guesses
+        #deltaFreq_rem = 4
+
         indexRange = 200
 
-        posList = np.ones((self.rows, self.columns), dtype='int') * -1
+        freqList = np.ones((self.rows, self.columns), dtype='float') * -1
 
         for row in range(self.rows):
             for col in range(self.columns):
@@ -205,52 +211,91 @@ class Control(Detector):
 
                 indexGuess = (row * self.columns) + col
 
-                indexLower = indexGuess - indexRange
-                indexUpper = indexGuess + indexRange
+                idxLower = indexGuess - indexRange
+                idxUpper = indexGuess + indexRange
 
-                if indexLower < 0:
-                    indexLower = 0
-                if indexUpper > len(freqInitial):
-                    indexUpper = len(freqInitial)
-
-                searchFreqInitial = freqInitial[indexLower:indexUpper]
+                #searchFreqInitial = freqInitial[idxLower:idxUpper]
+                searchFreqInitial = freqInitial
 
                 sat_current = self.__fieldToCurrent(self.resArray[row, col].properties['SatField'])
 
                 self.selectMagnet(row, col, True)
                 self.setCurrent(sat_current * 1000)
 
-                searchFreqFinal = self.frequencies[indexLower:indexUpper]
+                freqFinal = self.frequencies
 
-                size = len(searchFreqFinal)
-                searchFreqDiff = np.ones((size,size))
+                #searchFreqFinal = freqFinal[idxLower:idxUpper]
+                searchFreqFinal = freqFinal
+
+                searchFreqDiff = np.ones((len(searchFreqInitial),len(searchFreqFinal)))
 
                 for finalIdx, finalFreq in enumerate(searchFreqFinal):
                     for initialIdx, initialFreq in enumerate(searchFreqInitial):
                         searchFreqDiff[initialIdx, finalIdx] = finalFreq-initialFreq
 
 
-                searchFreqErr = np.abs(np.round(searchFreqDiff + deltaFreq,5))
+                searchFreqErr = np.abs(np.round(searchFreqDiff + deltaFreq_sat,5))
 
                 searchFreqCoord = np.unravel_index(np.argmin(searchFreqErr, axis=None),
                                                    searchFreqErr.shape)
 
-                idxInital = searchFreqCoord[0]
+                idxInitial = searchFreqCoord[0]
                 idxFinal = searchFreqCoord[1]
 
-                indexFound = idxInital + indexLower
 
-                posList[row, col] = indexFound
+                #indexFound = idxInitial + indexLower
+                indexFound = idxInitial
+                resFreq = freqInitial[indexFound]
+
+                freqList[row, col] = resFreq
 
                 self.resetMagnetRect()
 
-        print(posList)
+        self.__plotFreqs(freqList)
 
-        return posList
-
-
+        return freqList
 
 
+
+    def __plotFreqs(self, freqs):
+        labels = np.array([])
+        data = np.array([])
+        for idx, freq in np.ndenumerate(freqs):
+            labels = np.append(labels, str(idx))
+            data = np.append(data, freq)
+
+        fig = plt.figure(figsize=(8, 1.5))
+        ax = fig.add_subplot(1, 1, 1)
+
+        ax.spines['right'].set_color('none')
+        ax.spines['left'].set_color('none')
+        ax.yaxis.set_major_locator(ticker.NullLocator())
+        ax.spines['top'].set_color('none')
+        ax.xaxis.set_ticks_position('bottom')
+        ax.tick_params(which='major', width=1.00)
+        ax.tick_params(which='major', length=5)
+        ax.tick_params(which='minor', width=0.75)
+        ax.tick_params(which='minor', length=2.5)
+        ax.set_xlim(int(np.amin(data)), int(np.amax(data)) + 1)
+        ax.set_ylim(0, 1)
+        ax.patch.set_alpha(0.0)
+
+        ax.xaxis.set_major_locator(ticker.AutoLocator())
+        ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
+
+        ax.plot(data, np.zeros(data.size), '-bD', linestyle='')
+
+        for idx, label in enumerate(labels):
+            ax.annotate(label, xy=(data[idx], 0),
+                        xytext=(0, 10), textcoords='offset pixels',
+                        rotation=90, ha='left', va='bottom')
+
+        ax.set_xlabel('Frequency (MHz)')
+        ax.set_title('')
+
+        plt.show()
+
+        return True
 
 
     def testFreqShift(self, I):
