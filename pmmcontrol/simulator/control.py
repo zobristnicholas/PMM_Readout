@@ -160,40 +160,6 @@ class Control(Detector):
 
         raise NotImplementedError
 
-    # doesn't work for swapped resonators
-    def resIdBasic(self):
-
-        posList = np.array([], dtype='int')
-
-        for row in range(self.rows):
-            for col in range (self.columns):
-                self.selectMagnet(row, col, True)
-
-                initial_freq = self.frequencies
-                sat_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['SatField'])
-                co_current = self.__fieldToCurrent(self.resArray[self.curr_row, self.curr_column].properties['Coercivity'])
-                self.setCurrent(1000 * sat_current)
-                final_freq = self.frequencies
-
-                if len(final_freq) > len(initial_freq):
-                    print("Frequencies separated...")
-                elif len(final_freq) < len(initial_freq):
-                    print("Frequencies merged...")
-
-
-
-                diff = abs(np.subtract(final_freq, initial_freq))
-                #self.plotState('Frequency')
-                self.resetMagnetRect()
-
-                posList = np.append(posList, np.argmax(diff))
-
-        posList = posList.reshape(self.rows, self.columns)
-
-        print(posList)
-
-        return posList
-
     def resId(self):
         deltaFreq_sat = .0392
 
