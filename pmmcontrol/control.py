@@ -1,7 +1,9 @@
 import numpy as np
 from pmmcontrol.arduino import Arduino
-from time import sleep
+from time import sleep, time
 from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import axes3d
 
 
 class Control(Arduino):
@@ -20,10 +22,16 @@ class Control(Arduino):
         self.R_primary = 620
         self.R_auxiliary = 2400
 
-        # value of current sense resistor
-        self.R_sense = 0.1
+        self.row_primary_res = np.ones(self.rows) * self.R_primary
+        self.row_auxiliary_res = np.ones(self.rows) * self.R_auxiliary
+        self.col_primary_res = np.ones(self.cols) * self.R_primary
+        self.col_auxiliary_res = np.ones(self.cols) * self.R_auxiliary
 
-        self.max_voltage = 4
+        # value of current sense resistor
+        self.R_sense = 0.115
+
+        self.max_voltage = 5
+        self.max_voltage_linear = 3.5
 
         # PIN CONFIGURATION
 
@@ -75,6 +83,10 @@ class Control(Arduino):
         # ENABLE IF DAC ATTACHED
         #self.__calibrateDACVoltage()
 
+        # calibrate current sense while DAC is at 0
+        self.sense_offset = 0
+        self.sense_offset = self.readTotalCurrent()
+
         if self_test:
             self.testConfig()
 
@@ -98,22 +110,21 @@ class Control(Arduino):
 
         # test each magnet positive and negative
         for row in range(0, self.rows):
-            for col in range(0, self.cols):
+            for col in range(2, self.cols):
                 # select magnet
                 print("Selecting magnet at coordinate {}, {}".format(row, col))
                 self.selectMagnet(row, col)
 
                 # set magnet high, low, then off
-                print("Setting voltage high")
-                self.setVoltage(5)
+                self.setVoltage(self.max_voltage_linear)
                 sleep(0.01)
-                print("Reading current")
                 self.pos_test[row][col] = self.readTotalCurrent()
 
-                print("Setting voltage low")
-                self.setVoltage(-5)
+                self.setVoltage(0)
                 sleep(0.01)
-                print("Reading total current")
+
+                self.setVoltage(-self.max_voltage_linear)
+                sleep(0.01)
                 self.neg_test[row][col] = self.readTotalCurrent()
 
                 self.setVoltage(0)
@@ -123,6 +134,155 @@ class Control(Arduino):
         print("Null current: ", self.null_current)
         print("High test: ", self.pos_test)
         print("Low test: ", self.neg_test)
+
+        plt.figure(1)
+        plt.plot(self.pos_test.flatten())
+        plt.title('Maximum Current')
+
+        plt.figure(2)
+        plt.plot(self.neg_test.flatten())
+        plt.title('Minimum Current')
+
+        plt.show()
+
+        return True
+
+    def readTotalCurrent(self):
+        '''
+        Uses current sense circuit to measure the total current flowing to ground.
+        '''
+
+        t1 = time()
+
+        boxcar = 100
+        sense_voltage_sum = 0
+
+        for inc in range(boxcar):
+            sense_voltage_sum = sense_voltage_sum+ self.analogRead(self.sense_pin) * (5 / 1024)
+
+        sense_voltage = sense_voltage_sum / boxcar
+
+        # differential voltage across current sense IC with gain of 50 and offset of 2.5V
+        diff_voltage = (sense_voltage - 2.5) / 50
+
+        t2 = time()
+
+        #print("Measurement takes {} seconds".format(str(round(t2-t1, 4))))
+
+        return (diff_voltage / self.R_sense) - self.sense_offset
+
+    def voltageSweep(self):
+        '''
+        '''
+
+        vStep = np.linspace(0, self.max_voltage, 30)
+        cData_pos = np.array([])
+        cData_neg = np.array([])
+
+        # enable any magnet so we can read current
+        self.selectMagnet(3,3)
+
+        for v in vStep:
+            self.setVoltage(v, True)
+            sleep(.05)
+            cData_pos = np.append(cData_pos, self.readTotalCurrent())
+
+        self.setVoltage(0)
+
+        for v in vStep:
+            self.setVoltage(-v, True)
+            sleep(.01)
+            cData_neg = np.append(cData_neg, abs(self.readTotalCurrent()))
+
+        self.setVoltage(0)
+
+        #save the data
+        self.cData_pos = cData_pos
+        self.cData_neg = cData_neg
+
+        plt.plot(vStep, cData_pos, label='Positive Voltages')
+        plt.plot(vStep, cData_neg, label='Negative Voltages')
+        plt.ylabel('|Current| [A]')
+        plt.xlabel('Voltage [V]')
+        plt.title('Output Current Linearity')
+        plt.grid(True)
+        plt.legend()
+        plt.show()
+
+        return True
+
+
+    def measureResistors(self):
+
+        print("MEASURING RESISTORS...")
+
+        set_voltage = self.max_voltage_linear
+
+        # set DAC to zero
+        self.writeDAC(0)
+
+        # disable all switches
+        for pin in self.enable_pins:
+            self.setLow(pin)
+
+        self.setHigh(self.sign_pins['positive'])
+        self.setLow(self.sign_pins['negative'])
+
+        for row in range(0, self.rows):
+
+            # configure to measure primary resistor with positive voltage
+            self.setHigh(self.row_primary_pins[row])
+
+            # set voltage on DAC
+            binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.Vcc)
+            self.writeDAC(binary)
+            sleep(.1)
+            self.row_primary_res[row] = (set_voltage * 3) / abs(self.readTotalCurrent())
+            print(self.row_primary_res[row])
+            # set DAC to zero
+            self.writeDAC(0)
+
+            self.setLow(self.row_primary_pins[row])
+            self.setHigh(self.row_auxiliary_pins[row])
+
+            # set voltage on DAC
+
+            self.writeDAC(binary)
+            sleep(.1)
+            self.row_auxiliary_res[row] = (set_voltage * 3) / abs(self.readTotalCurrent())
+            print(self.row_auxiliary_res[row])
+            # set DAC to zero
+            self.writeDAC(0)
+
+            self.setLow(self.row_auxiliary_pins[row])
+
+        for col in range(2, self.cols):
+
+            # configure to measure primary resistor with positive voltage
+            self.setHigh(self.col_primary_pins[col])
+
+            # set voltage on DAC
+            binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.Vcc)
+            self.writeDAC(binary)
+            sleep(.1)
+            self.col_primary_res[col] = (set_voltage * 3) / abs(self.readTotalCurrent())
+            print(self.col_primary_res[col])
+            # set DAC to zero
+            self.writeDAC(0)
+
+            self.setLow(self.col_primary_pins[col])
+            self.setHigh(self.col_auxiliary_pins[col])
+
+            # set voltage on DAC
+            binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.Vcc)
+            self.writeDAC(binary)
+            sleep(.1)
+            self.col_auxiliary_res[col] = (set_voltage * 3) / abs(self.readTotalCurrent())
+            print(self.col_auxiliary_res[col])
+            # set DAC to zero
+            self.writeDAC(0)
+
+            self.setLow(self.col_auxiliary_pins[col])
 
         return True
 
@@ -145,60 +305,71 @@ class Control(Arduino):
                              str(self.cols - 1))
 
         # record state
-        self.current_row = row
-        self.current_column = column
-        self.current_sign = sign
-        self.current_isPrimary = isPrimary
-        self.current_isArrayMode = isArrayMode
+        self.state_row = row
+        self.state_col = column
+        self.state_sign = sign
+        self.state_isPrimary = isPrimary
+        self.state_isArrayMode = isArrayMode
+
+        if self.state_isPrimary:
+            r1 = self.row_primary_res[self.state_row]
+            r2 = self.col_primary_res[self.state_col]
+        else:
+            r1 = self.row_auxiliary_res[self.state_row]
+            r2 = self.col_auxiliary_res[self.state_col]
+
+        self.state_effective_res = ((r1*r2)/(r1+r2))
 
         # state values to be set later
-        self.current_posDAC = None
-        self.current_voltage = None
+        self.state_posDAC = None
+        self.state_voltage = None
 
         return True
 
-    def setCurrent(self, current):
+    def setCurrent(self, current, allowNL=False):
         '''
-        Sets a current by selecting an appropriate binary number for the DAC. The current
+        Sets a current (in mA) by selecting an appropriate binary number for the DAC. The current
         flows through whichever magnet has been enabled by running selectMagnet first.
-        Calling this with array parameter False will disable all other switches. With array
-        parameter True, it will set all other magnets to minimum current in the opposite
-        direction.
+
+        allowNL is set to True if voltages in the non-linear range are allowed
         '''
-        if not hasattr(self, 'current_sign'):
+        if not hasattr(self, 'state_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if not self.current_isPrimary and self.current_isArrayMode:
+        if not self.state_isPrimary and self.state_isArrayMode:
             raise ValueError("Can only set currents in array mode if magnet has been selected as primary")
 
+        set_current = (current / 1000)
+
         # get required voltage
-        voltage = self.__currentToVoltage(current)
 
-        if np.abs(voltage) > self.max_voltage[self.current_row]:
-            max_current = round(self.max_voltage[self.current_row] /
-                                self.R_row[self.current_row], 4)
-            raise ValueError('The maximum current allowed on this row is ' +
-                             str(max_current)[:5] + ' A')
+        voltage = (set_current * self.state_effective_res) / 3
 
-        self.setVoltage(voltage)
+        self.setVoltage(voltage, allowNL)
 
-        return True
-
-    def setVoltage(self, voltage):
+    def setVoltage(self, voltage, allowNL=False):
         '''
         Sets a DAC voltage by selecting an appropriate binary number. The current
         flows through whichever magnet has been enabled by running selectMagnet first.
         Depending on the sign of the voltage, this is not necessarily the voltage accross
         the device.
         '''
-        if not hasattr(self, 'current_sign'):
+        if not hasattr(self, 'state_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if not self.current_isPrimary and self.current_isArrayMode:
+        if not self.state_isPrimary and self.state_isArrayMode:
             raise ValueError("Can only set voltages in array mode if magnet has been selected as primary")
-        if np.abs(voltage) > self.max_voltage:
-            raise ValueError('The maximum voltage output is ' +
-                             str(self.max_voltage) + ' V')
+
+        if not allowNL:
+            voltage_max = self.max_voltage_linear
+        else:
+            voltage_max = self.max_voltage
+
+        current_max = voltage_max / self.state_effective_res
+
+        if np.abs(voltage) > voltage_max:
+            error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
+            raise ValueError(error)
 
         # disable all switches
         for pin in self.enable_pins:
@@ -208,33 +379,33 @@ class Control(Arduino):
         self.writeDAC(0)
 
         # enable switches (row, column) depending on whether the magnet is primary
-        if self.current_isPrimary:
-            self.setHigh(self.col_primary_pins[self.current_column])
-            self.setHigh(self.row_primary_pins[self.current_row])
+        if self.state_isPrimary:
+            self.setHigh(self.col_primary_pins[self.state_col])
+            self.setHigh(self.row_primary_pins[self.state_row])
         else:
-            self.setHigh(self.col_auxiliary_pins[self.current_column])
-            self.setHigh(self.row_auxiliary_pins[self.current_row])
+            self.setHigh(self.col_auxiliary_pins[self.state_col])
+            self.setHigh(self.row_auxiliary_pins[self.state_row])
 
-        self.setHigh(self.sign_pins[self.current_sign])
+        self.setHigh(self.sign_pins[self.state_sign])
 
         # need to configure all other magnets if array mode is True
-        if self.current_isArrayMode:
+        if self.state_isArrayMode:
             # set all rows except selected to auxiliary function
             for row_pin_auxiliary, row_pin_primary in zip(self.row_auxiliary_pins, self.row_primary_pins):
-                if row_pin_auxiliary != self.row_auxiliary_pins[self.current_row]:
+                if row_pin_auxiliary != self.row_auxiliary_pins[self.state_row]:
                     self.setLow(row_pin_primary)
                     self.setHigh(row_pin_auxiliary)
 
             # set all columns except selected to auxiliary function
             for column_pin_auxiliary, column_pin_primary in zip(self.col_auxiliary_pins, self.col_primary_pins):
-                if column_pin_auxiliary != self.col_auxiliary_pins[self.current_column]:
+                if column_pin_auxiliary != self.col_auxiliary_pins[self.state_col]:
                     self.setLow(column_pin_primary)
                     self.setHigh(column_pin_auxiliary)
 
 
         # change enable pins if sign change is necessary
-        if (np.sign(voltage) == -1 and self.current_sign == 'positive') or \
-                (np.sign(voltage) == 1 and self.current_sign == 'negative'):
+        if (np.sign(voltage) == -1 and self.state_sign == 'positive') or \
+                (np.sign(voltage) == 1 and self.state_sign == 'negative'):
             self.setLow(self.sign_pins['positive'])
             self.setHigh(self.sign_pins['negative'])
             posDAC = False
@@ -244,92 +415,85 @@ class Control(Arduino):
             posDAC = True
 
         # set voltage on DAC
-        binary = int(np.abs(voltage)* 2**16 / self.Vcc)
+        binary = int(np.abs(voltage)* (2**16 - 1) / self.Vcc)
         self.writeDAC(binary)
 
-        self.current_posDAC = posDAC # keep track of sign of DAC
-        self.current_voltage = voltage # keep track of voltage
+        self.state_posDAC = posDAC # keep track of sign of DAC
+        self.state_voltage = voltage # keep track of voltage
 
         return True
 
-    def updateCurrent(self, current):
+    def updateCurrent(self, current, allowNL=False):
         '''
         Updates the current of the currently selected magnet without resetting all the enables.
         Essentially just updates the DAC but cares for the sign of the voltage.
         '''
 
-        if not hasattr(self, 'current_sign'):
+        if not hasattr(self, 'state_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if self.current_voltage == None:
+        if self.state_voltage == None:
             raise AttributeError("Initial current has not been set. " +
                                  " Run 'setCurrent()' first")
-        if not self.current_isPrimary and self.isArrayMode:
+        if not self.state_isPrimary and self.isArrayMode:
             raise ValueError("Can only set currents in array mode if magnet has been selected as primary")
 
+        set_current = current / 1000
+
         # get required voltage
-        voltage = self.__currentToVoltage(current)
+        voltage = self.__currentToVoltage(set_current)
 
-        if np.abs(voltage) > self.max_voltage[self.current_row]:
-            max_current = round(self.max_voltage[self.current_row] /
-                                self.R_row[self.current_row], 4)
-            raise ValueError('The maximum current allowed on this row is ' +
-                             str(max_current)[:5] + ' A')
-
-        self.updateVoltage(voltage)
+        self.updateVoltage(voltage, allowNL)
 
         return True
 
-    def updateVoltage(self, voltage):
+    def updateVoltage(self, voltage, allowNL=False):
         '''
         Updates the voltage of the currently selected magnet without resetting all the enables.
         Essentially just updates the DAC but cares for the sign of the voltage.
         '''
 
-        if not hasattr(self, 'current_sign'):
+        if not hasattr(self, 'state_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if self.current_voltage == None:
+        if self.state_voltage == None:
             raise AttributeError("Initial voltage has not been set. " +
                                  " Run 'setVoltage()' first")
-        if not self.current_isPrimary and self.isArrayMode:
+        if not self.state_isPrimary and self.isArrayMode:
             raise ValueError("Can only set voltages in array mode if magnet has been selected as primary")
-        if np.abs(voltage) > self.max_voltage:
-            raise ValueError('The maximum voltage output is ' +
-                             str(self.max_voltage) + ' V')
+
+
+        if not allowNL:
+            voltage_max = self.max_voltage_linear
+        else:
+            voltage_max = self.max_voltage
+
+        current_max = voltage_max / self.current_R_row
+
+        if np.abs(voltage) > voltage_max:
+            error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
+            raise ValueError(error)
 
         # change enable pins if sign change is necessary
-        if (np.sign(voltage) == -1 and self.current_sign == 'positive') or \
-                (np.sign(voltage) == 1 and self.current_sign == 'negative'):
-            if self.current_posDAC: # only change enables if DAC is set positive
+        if (np.sign(voltage) == -1 and self.state_sign == 'positive') or \
+                (np.sign(voltage) == 1 and self.state_sign == 'negative'):
+            if self.state_posDAC: # only change enables if DAC is set positive
                 self.setLow(self.sign_pins['positive'])
                 self.setHigh(self.sign_pins['negative'])
-                self.current_posDAC = False # update state
+                self.state_posDAC = False # update state
         else:
-            if not self.current_posDAC: # only change enables if DAC is set negative
+            if not self.state_posDAC: # only change enables if DAC is set negative
                 self.setLow(self.sign_pins['negative'])
                 self.setHigh(self.sign_pins['positive'])
-                self.current_posDAC = True # update state
+                self.state_posDAC = True # update state
 
         # set voltage on DAC
         binary = int(np.abs(voltage) * 2 ** 16 / self.Vcc)
         self.writeDAC(binary)
 
-        self.current_voltage = voltage
+        self.state_voltage = voltage
 
-        return True
-
-    def readTotalCurrent(self):
-        '''
-        Uses current sense circuit to measure the total current flowing to ground.
-        '''
-
-        sense_voltage = self.analogRead(self.sense_pin)
-
-        # differential voltage across current sense IC with gain of 50 and offset of 2.5V
-        diff_voltage = (sense_voltage - 7.5) / 50
-
-        return diff_voltage / self.R_sense
+        print("Total current is now " + str(self.readTotalCurrent()*1000) + ' mA')
 
     def resetMagnet(self):
         '''
@@ -337,7 +501,7 @@ class Control(Arduino):
         exponentially decaying current. DAC finishes at 0V.
         '''
 
-        if not hasattr(self, 'current_sign'):
+        if not hasattr(self, 'state_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
         if self.isArrayMode:
@@ -345,8 +509,8 @@ class Control(Arduino):
 
         # set oscillating and exponentially decaying current through (row, column) magnet
         tt = np.arange(0, 70)
-        max_current = round(self.max_voltage[self.current_row] /
-                            self.R_row[self.current_row], 4)
+        max_current = round(self.max_voltage_linear[self.state_row] /
+                            self.R_row[self.state_row], 4)
         current_list = np.exp(-tt / 20.0) * np.cos(tt / 3.0) * max_current
         current_list = np.append(current_list, 0)
 
@@ -394,36 +558,36 @@ class Control(Arduino):
         Changes the sign of the row and column currently selected by selectMagnet.
         selectMagnet must be run first. The DAC voltage remains at 0 V until reset.
         '''
-        if hasattr(self, 'current_row') and hasattr(self, 'current_column') and \
-           hasattr(self, 'current_sign'):
+        if hasattr(self, 'state_row') and hasattr(self, 'state_column') and \
+           hasattr(self, 'state_sign'):
             # enforce going through 0
             self.writeDAC(0)
             # disable switches
-            self.setLow(self.column_pins[self.current_column])
-            self.setLow(self.row_pins[self.current_row])
-            self.setLow(self.sign_pins[self.current_sign])
+            self.setLow(self.column_pins[self.state_col])
+            self.setLow(self.row_pins[self.state_row])
+            self.setLow(self.sign_pins[self.state_sign])
             # switch current sign variable
-            if self.current_sign == 'positive':
-                self.current_sign = 'negative'
+            if self.state_sign == 'positive':
+                self.state_sign = 'negative'
             else:
-                self.current_sign = 'positive'
+                self.state_sign = 'positive'
             # enable switches
-            self.setHigh(self.column_pins[self.current_column])
-            self.setHigh(self.row_pins[self.current_row])
-            self.setHigh(self.sign_pins[self.current_sign])
+            self.setHigh(self.column_pins[self.state_col])
+            self.setHigh(self.row_pins[self.state_row])
+            self.setHigh(self.sign_pins[self.state_sign])
         else:
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
 
         return True
 
-    def __currentToVoltage(self, current):
+    def __currentToVoltage(self, current, r):
         '''
         Converts the requested current into a voltage required to be output by the DAC.
         Each row has a large resistor whose value is recorded in R_row.
         '''
 
-        voltage = self.R_row[self.current_row] * current
+        voltage = r * current
 
         return voltage
 
@@ -469,8 +633,14 @@ class Control(Arduino):
                                                       target_voltages, kind='linear'))
 
         # record the max voltage for each row
-        self.max_voltage = []
+        self.max_voltage_linear = []
         for voltages in real_voltages:
-            self.max_voltage.append(voltages[-1])
+            self.max_voltage_linear.append(voltages[-1])
 
         return True
+
+    def __chooseResistor(self, primary):
+        if primary:
+            return self.R_primary
+        if not primary:
+            return self.R_auxiliary
