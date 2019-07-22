@@ -15,17 +15,18 @@ class Control(Arduino):
         self.rows = 9
         self.cols = 10
 
-        # define resistor values in np array
-        self.R_row = 356 * np.ones(10)
-
         # define resistor values
         self.R_primary = 620
         self.R_auxiliary = 2400
 
         self.row_primary_res = np.ones(self.rows) * self.R_primary
+        self.row_primary_res = [635.06933744, 637.68953069, 637.68953069, 636.376737, 632.79426817, 633.76729882, 636.376737, 636.04938272, 635.39568345]
         self.row_auxiliary_res = np.ones(self.rows) * self.R_auxiliary
+        self.row_auxiliary_res = [2415, 2419.7260274, 2410.29239766, 2410.29239766, 2391.64410058, 2434.01574803, 2419.7260274 , 2415, 2434.01574803]
         self.col_primary_res = np.ones(self.cols) * self.R_primary
+        self.col_primary_res = [620, 620, 638.01857585, 636.04938272, 636.70442842, 635.72236504, 637.68953069, 637.0324575, 637.0324575, 632.79426817]
         self.col_auxiliary_res = np.ones(self.cols) * self.R_auxiliary
+        self.col_auxiliary_res = [2400, 2400, 2405.60311284, 2438.81656805, 2415, 2424.47058824, 2434.01574803, 2463.10756972, 2448.47524752, 2458.21073559]
 
         # value of current sense resistor
         self.R_sense = 0.115
@@ -77,15 +78,18 @@ class Control(Arduino):
         # define output pins
         self.output(self.enable_pins)
 
+        # set DAC to zero
+        self.writeDAC(0)
+
         # calibrate max voltage for DAC output
+        self.Vcc = self.readVcc()
         sleep(0.5)  # let Vcc equilibriate
 
         # ENABLE IF DAC ATTACHED
         #self.__calibrateDACVoltage()
 
         # calibrate current sense while DAC is at 0
-        self.sense_offset = 0
-        self.sense_offset = self.readTotalCurrent()
+        self.calibrateOffCurrent()
 
         if self_test:
             self.testConfig()
@@ -147,27 +151,25 @@ class Control(Arduino):
 
         return True
 
-    def readTotalCurrent(self):
+    def readTotalCurrent(self, seconds=2):
         '''
         Uses current sense circuit to measure the total current flowing to ground.
         '''
 
-        t1 = time()
-
-        boxcar = 100
         sense_voltage_sum = 0
+        sense_voltage_inc = 0
 
-        for inc in range(boxcar):
-            sense_voltage_sum = sense_voltage_sum+ self.analogRead(self.sense_pin) * (5 / 1024)
+        self.Vcc = self.readVcc()
 
-        sense_voltage = sense_voltage_sum / boxcar
+        t1 = time()
+        while time() - t1 < seconds:
+            sense_voltage_sum = sense_voltage_sum + self.analogRead(self.sense_pin) * (self.Vcc / 1023)
+            sense_voltage_inc = sense_voltage_inc + 1
+
+        sense_voltage = sense_voltage_sum / sense_voltage_inc
 
         # differential voltage across current sense IC with gain of 50 and offset of 2.5V
-        diff_voltage = (sense_voltage - 2.5) / 50
-
-        t2 = time()
-
-        #print("Measurement takes {} seconds".format(str(round(t2-t1, 4))))
+        diff_voltage = (sense_voltage - (self.Vcc/2)) / 50
 
         return (diff_voltage / self.R_sense) - self.sense_offset
 
@@ -175,7 +177,7 @@ class Control(Arduino):
         '''
         '''
 
-        vStep = np.linspace(0, self.max_voltage, 30)
+        vStep = np.linspace(0, self.max_voltage_linear, 30)
         cData_pos = np.array([])
         cData_neg = np.array([])
 
@@ -184,15 +186,13 @@ class Control(Arduino):
 
         for v in vStep:
             self.setVoltage(v, True)
-            sleep(.05)
-            cData_pos = np.append(cData_pos, self.readTotalCurrent())
+            cData_pos = np.append(cData_pos, self.readTotalCurrent(1))
 
         self.setVoltage(0)
 
         for v in vStep:
             self.setVoltage(-v, True)
-            sleep(.01)
-            cData_neg = np.append(cData_neg, abs(self.readTotalCurrent()))
+            cData_neg = np.append(cData_neg, abs(self.readTotalCurrent(1)))
 
         self.setVoltage(0)
 
@@ -365,7 +365,7 @@ class Control(Arduino):
         else:
             voltage_max = self.max_voltage
 
-        current_max = voltage_max / self.state_effective_res
+        current_max = voltage_max * self.state_effective_res
 
         if np.abs(voltage) > voltage_max:
             error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
@@ -417,11 +417,12 @@ class Control(Arduino):
         # set voltage on DAC
         binary = int(np.abs(voltage)* (2**16 - 1) / self.Vcc)
         self.writeDAC(binary)
+        sleep(1)
 
         self.state_posDAC = posDAC # keep track of sign of DAC
         self.state_voltage = voltage # keep track of voltage
 
-        return True
+        print("Total current is now " + str(self.readTotalCurrent() * 1000) + ' mA')
 
     def updateCurrent(self, current, allowNL=False):
         '''
@@ -492,8 +493,6 @@ class Control(Arduino):
         self.writeDAC(binary)
 
         self.state_voltage = voltage
-
-        print("Total current is now " + str(self.readTotalCurrent()*1000) + ' mA')
 
     def resetMagnet(self):
         '''
