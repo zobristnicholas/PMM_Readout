@@ -29,7 +29,8 @@ class Control(Arduino):
         self.col_auxiliary_res = [2400, 2400, 2405.60311284, 2438.81656805, 2415, 2424.47058824, 2434.01574803, 2463.10756972, 2448.47524752, 2458.21073559]
 
         # value of current sense resistor
-        self.R_sense = 0.1197
+        self.R_sense = 0.11385998319919945
+        self.sense_offset = -0.0010572307227702834
 
         self.max_voltage = 5
         self.max_voltage_linear = 3.5
@@ -89,7 +90,7 @@ class Control(Arduino):
         #self.__calibrateDACVoltage()
 
         # calibrate current sense while DAC is at 0
-        self.calibrateOffCurrent()
+        # self.calibrateOffCurrent_Quick()
 
         if self_test:
             self.testConfig()
@@ -156,33 +157,28 @@ class Control(Arduino):
         Uses current sense circuit to measure the total current flowing to ground.
         '''
 
-        sense_voltages = np.array([])
-        self.Vcc = self.readVcc()
+        diff_voltages = np.array([])
 
         t1 = time()
         while time() - t1 < seconds:
-            sense_voltages = np.append(sense_voltages, self.analogRead(self.sense_pin) * (self.Vcc / 1023))
+            sense_voltage = self.analogRead(self.sense_pin) * (5 / 1023)
+            diff_voltages = np.append(diff_voltages, (sense_voltage - (2.5)) / 50)
 
-        sense_voltage = np.mean(sense_voltages)
-
-        diff_voltage = (sense_voltage - (self.Vcc / 2)) / 50
+        diff_voltage = np.mean(diff_voltages)
 
         return (diff_voltage / self.R_sense) - self.sense_offset
 
-    def readTotalCurrentError(self, seconds=2):
+    def readTotalCurrentError(self, seconds=3):
 
-        sense_voltages = np.array([])
-        self.Vcc = self.readVcc()
+        diff_voltages = np.array([])
 
-        t1= time()
+        t1 = time()
         while time() - t1 < seconds:
-            sense_voltages = np.append(sense_voltages, self.analogRead(self.sense_pin) * (self.Vcc / 1023))
+            sense_voltage = self.analogRead(self.sense_pin) * (5 / 1023)
+            diff_voltages = np.append(diff_voltages, (sense_voltage - (2.5)) / 50)
 
-        sense_voltage_avg = np.mean(sense_voltages)
-        sense_voltage_error = np.std(sense_voltages)
-
-        diff_voltage_avg = (sense_voltage_avg - (self.Vcc/2)) / 50
-        diff_voltage_error = sense_voltage_error / 50
+        diff_voltage_avg = np.mean(diff_voltages)
+        diff_voltage_error = np.std(diff_voltages)
 
         return {
             "Average": (diff_voltage_avg / self.R_sense) - self.sense_offset,
@@ -190,7 +186,7 @@ class Control(Arduino):
         }
 
 
-    def calibrateOffCurrent(self, seconds=5):
+    def calibrateOffCurrent_Quick(self, seconds=5):
 
         print("MEASURING OFF CURRENT...")
 
@@ -202,17 +198,15 @@ class Control(Arduino):
 
         return True
 
-    def measureSenseResistor(self):
+    def calibrateCurrentSense(self, steps=10):
 
         print("MEASURING SENSE RESISTOR...")
 
         vMin = -self.max_voltage_linear
         vMax = self.max_voltage_linear
-        vSteps = 3
+        vSteps = steps
 
         row = 1
-
-        self.Vcc = self.readVcc()
 
         set_voltages = np.linspace(vMin, vMax, vSteps)
         current_inputs = np.zeros(vSteps)
@@ -241,7 +235,8 @@ class Control(Arduino):
             sleep(.1)
 
             current_inputs[idx] = float(input("Measured current in mA")) / 1000
-            vsense[idx] = ((self.analogRead(self.sense_pin) * (self.Vcc / 1023)) - (self.Vcc/2)) / 50
+
+            vsense[idx] = ((self.analogRead(self.sense_pin) * (5 / 1023)) - (2.5)) / 50
 
             self.writeDAC(0)
 
@@ -255,18 +250,20 @@ class Control(Arduino):
         linPoints = np.linspace(np.amin(vsense), np.amax(vsense), vSteps*100)
 
         self.R_sense = 1/slope
+        self.sense_offset = -intercept
 
-        plt.plot(vsense, current_inputs, marker='x', linestyle='', color='blue')
-        plt.plot(linPoints, intercept + slope * linPoints,
+        plt.plot(vsense*1000, current_inputs*1000, marker='x', linestyle='', color='blue')
+        plt.plot(linPoints*1000, 1000*(intercept + slope * linPoints),
                  linestyle='--', color='orange', label='Linear Fit: R = {}\nSense Resistance: {} Ohm'.format(str(round(r_value, 4)),str(round(self.R_sense, 4))))
-        plt.xlabel("Differential Sense Voltage [V]")
-        plt.ylabel("Current [A]")
+        plt.xlabel("Differential Sense Voltage [mV]")
+        plt.ylabel("Current [mA]")
         plt.title('Total Current vs. Sense Voltage')
         plt.legend()
         plt.grid()
         plt.show()
 
         print("Sense resistance: ", self.R_sense)
+        print("Sense offset: ", self.sense_offset)
 
 
     def voltageSweep(self):
@@ -375,12 +372,13 @@ class Control(Arduino):
         for pin in self.enable_pins:
             self.setLow(pin)
 
+        # enable positive voltages
         self.setHigh(self.sign_pins['positive'])
         self.setLow(self.sign_pins['negative'])
 
         for row in range(0, self.rows):
 
-            # configure to measure primary resistor with positive voltage
+            # configure to measure primary resistor
             self.setHigh(self.row_primary_pins[row])
 
             # set voltage on DAC
@@ -392,6 +390,7 @@ class Control(Arduino):
             # set DAC to zero
             self.writeDAC(0)
 
+            # configure to measure auxiliary resistor
             self.setLow(self.row_primary_pins[row])
             self.setHigh(self.row_auxiliary_pins[row])
 
