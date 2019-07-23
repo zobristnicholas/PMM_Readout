@@ -82,6 +82,10 @@ class Control(Arduino):
         # set DAC to zero
         self.writeDAC(0)
 
+        # state values to be set later
+        self.DAC_isPos = None
+        self.DAC_voltage = None
+
         # calibrate max voltage for DAC output
         self.Vcc = self.readVcc()
         sleep(0.5)  # let Vcc equilibriate
@@ -150,7 +154,7 @@ class Control(Arduino):
 
         plt.show()
 
-        self.clearState()
+        self.deselectMagnet()
 
         return True
 
@@ -304,7 +308,7 @@ class Control(Arduino):
         plt.legend()
         plt.show()
 
-        self.clearState()
+        self.deselectMagnet()
 
         return True
 
@@ -360,7 +364,7 @@ class Control(Arduino):
 
         plt.show()
 
-        self.clearState()
+        self.deselectMagnet()
 
         return True
 
@@ -475,21 +479,15 @@ class Control(Arduino):
 
         self.state_effective_res = ((r1*r2)/(r1+r2))
 
-        # state values to be set later
-        self.state_posDAC = None
-        self.state_voltage = None
-
         return True
 
-    def clearState(self):
+    def deselectMagnet(self):
         del self.state_row
         del self.state_col
         del self.state_sign
         del self.state_isPrimary
         del self.state_isArrayMode
         del self.state_effective_res
-        del self.state_posDAC
-        del self.state_voltage
 
         return True
 
@@ -586,8 +584,8 @@ class Control(Arduino):
         self.writeDAC(binary)
         sleep(1)
 
-        self.state_posDAC = posDAC # keep track of sign of DAC
-        self.state_voltage = voltage # keep track of voltage
+        self.DAC_isPos = posDAC # keep track of sign of DAC
+        self.DAC_voltage = voltage # keep track of voltage
 
         print("Total current is now " + str(self.readTotalCurrent() * 1000) + ' mA')
 
@@ -600,20 +598,19 @@ class Control(Arduino):
         if not hasattr(self, 'state_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if self.state_voltage == None:
+        if self.DAC_voltage == None:
             raise AttributeError("Initial current has not been set. " +
                                  " Run 'setCurrent()' first")
         if not self.state_isPrimary and self.isArrayMode:
             raise ValueError("Can only set currents in array mode if magnet has been selected as primary")
 
-        set_current = current / 1000
+        set_current = (current / 1000)
 
         # get required voltage
-        voltage = self.__currentToVoltage(set_current)
+
+        voltage = (set_current * self.state_effective_res) / 3
 
         self.updateVoltage(voltage, allowNL)
-
-        return True
 
     def updateVoltage(self, voltage, allowNL=False):
         '''
@@ -624,7 +621,7 @@ class Control(Arduino):
         if not hasattr(self, 'state_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if self.state_voltage == None:
+        if self.DAC_voltage == None:
             raise AttributeError("Initial voltage has not been set. " +
                                  " Run 'setVoltage()' first")
         if not self.state_isPrimary and self.isArrayMode:
@@ -636,7 +633,7 @@ class Control(Arduino):
         else:
             voltage_max = self.max_voltage
 
-        current_max = voltage_max / self.current_R_row
+        current_max = voltage_max * self.state_effective_res
 
         if np.abs(voltage) > voltage_max:
             error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
@@ -645,21 +642,21 @@ class Control(Arduino):
         # change enable pins if sign change is necessary
         if (np.sign(voltage) == -1 and self.state_sign == 'positive') or \
                 (np.sign(voltage) == 1 and self.state_sign == 'negative'):
-            if self.state_posDAC: # only change enables if DAC is set positive
+            if self.DAC_isPos: # only change enables if DAC is set positive
                 self.setLow(self.sign_pins['positive'])
                 self.setHigh(self.sign_pins['negative'])
-                self.state_posDAC = False # update state
+                self.DAC_isPos = False # update state
         else:
-            if not self.state_posDAC: # only change enables if DAC is set negative
+            if not self.DAC_isPos: # only change enables if DAC is set negative
                 self.setLow(self.sign_pins['negative'])
                 self.setHigh(self.sign_pins['positive'])
-                self.state_posDAC = True # update state
+                self.DAC_isPos = True # update state
 
         # set voltage on DAC
-        binary = int(np.abs(voltage) * 2 ** 16 / self.Vcc)
+        binary = int(np.abs(voltage) * (2 ** 16 - 1) / self.Vcc)
         self.writeDAC(binary)
 
-        self.state_voltage = voltage
+        self.DAC_voltage = voltage
 
     def resetMagnet(self):
         '''
