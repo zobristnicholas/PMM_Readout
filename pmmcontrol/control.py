@@ -150,6 +150,8 @@ class Control(Arduino):
 
         plt.show()
 
+        self.clearState()
+
         return True
 
     def readTotalCurrent(self, seconds=2):
@@ -302,6 +304,8 @@ class Control(Arduino):
         plt.legend()
         plt.show()
 
+        self.clearState()
+
         return True
 
     def currentSweep(self):
@@ -355,6 +359,8 @@ class Control(Arduino):
         plt.legend()
 
         plt.show()
+
+        self.clearState()
 
         return True
 
@@ -472,6 +478,18 @@ class Control(Arduino):
         # state values to be set later
         self.state_posDAC = None
         self.state_voltage = None
+
+        return True
+
+    def clearState(self):
+        del self.state_row
+        del self.state_col
+        del self.state_sign
+        del self.state_isPrimary
+        del self.state_isArrayMode
+        del self.state_effective_res
+        del self.state_posDAC
+        del self.state_voltage
 
         return True
 
