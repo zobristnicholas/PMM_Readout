@@ -3,7 +3,7 @@ from pmmcontrol.arduino import Arduino
 from time import sleep, time
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import axes3d
+from scipy import stats
 
 
 class Control(Arduino):
@@ -237,6 +237,59 @@ class Control(Arduino):
         plt.title('Output Current Linearity')
         plt.grid(True)
         plt.legend()
+        plt.show()
+
+        return True
+
+    def currentSweep(self):
+        '''
+        '''
+
+        cMin = -30
+        cMax = 30
+        cSteps = 30
+
+        cStep = np.linspace(cMin, cMax, cSteps)
+        cData = np.array([])
+        cData_percent_error = np.array([])
+        cData_err = np.array([])
+
+        # enable any magnet so we can read current
+        self.selectMagnet(3,3)
+
+        for c in cStep:
+            self.setCurrent(c)
+            readData = self.readTotalCurrentError(1)
+            cData = np.append(cData, readData["Average"]*1000)
+            cData_percent_error = np.append(cData_percent_error, ((readData["Average"]*1000-c)/c)*100)
+            cData_err = np.append(cData_err, readData["Error"]*1000)
+
+
+        self.setCurrent(0)
+
+        #save the data
+        self.cStep = cStep
+        self.cData = cData
+        self.cData_err = cData_err
+
+        slope, intercept, r_value, p_value, std_err = stats.linregress(cStep, cData)
+
+        plt.figure(1)
+        plt.plot(cStep, cData_percent_error, linestyle='', marker='o', color='blue')
+        plt.ylabel('Error in Current [%]')
+        plt.xlabel('Set Current [mA]')
+        plt.title('Error in Current Control')
+        plt.ylim(-10, 10)
+        plt.grid(True)
+
+        plt.figure(2)
+        plt.errorbar(cStep, cData, cData_err, marker='x', linestyle='', color='blue')
+        plt.plot(np.linspace(cMin, cMax, cSteps*100), intercept+slope*np.linspace(cMin, cMax, cSteps*100), linestyle='--', color='orange', label='Linear Fit r={}'.format(str(round(r_value,2))))
+        plt.ylabel('Measured Current [mA]')
+        plt.xlabel('Set Current [mA]')
+        plt.title('Current Control')
+        plt.grid(True)
+
         plt.show()
 
         return True
