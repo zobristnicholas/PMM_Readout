@@ -173,6 +173,36 @@ class Control(Arduino):
 
         return (diff_voltage / self.R_sense) - self.sense_offset
 
+    def readTotalCurrentError(self, seconds=2):
+
+        sense_voltages = np.array([])
+        self.Vcc = self.readVcc()
+
+        t1= time()
+        while time() - t1 < seconds:
+            sense_voltages = np.append(sense_voltages, self.analogRead(self.sense_pin) * (self.Vcc / 1023))
+
+        sense_voltage_avg = np.mean(sense_voltages)
+        sense_voltage_error = np.std(sense_voltages)
+
+        diff_voltage_avg = (sense_voltage_avg - (self.Vcc/2)) / 50
+        diff_voltage_error = sense_voltage_error / 50
+
+        return {
+            "Average": (diff_voltage_avg / self.R_sense) - self.sense_offset,
+            "Error": (diff_voltage_error / self.R_sense) - self.sense_offset,
+        }
+
+
+    def calibrateOffCurrent(self, seconds=5):
+        # set DAC to zero
+        self.writeDAC(0)
+
+        self.sense_offset = 0
+        self.sense_offset = self.readTotalCurrent(seconds)
+
+        return True
+
     def voltageSweep(self):
         '''
         '''
