@@ -138,7 +138,8 @@ class Arduino(object):
         __DAC_PIN_OUTPUT. Returns a value between 0 and 5V and assumes that the default
         voltage range has not been changed with 'analogReference()' in serial_control.ino.
         '''
-        return self.analogRead(self.__DAC_PIN_OUTPUT) * self.Vcc / 1024
+
+        return self.analogRead(self.__DAC_PIN_OUTPUT) * self.readVcc() / 1023
 
     def readVcc(self):
         '''
@@ -146,13 +147,9 @@ class Arduino(object):
         voltage. Used to calibrate the max voltage that 'analogRead()' recieves from the
         board.
         '''
-        # read multiple times and average
-        Vcc = []
-        for index in range(10):
-            self.__sendData('8')
-            Vcc.append(float(self.__getData()) / 1000.0)
-            sleep(0.1)
-        return mean(Vcc)
+
+        self.__sendData('8')
+        return float(self.__getData()) / 1000.0
 
     def turnOnDAC(self):
         '''
