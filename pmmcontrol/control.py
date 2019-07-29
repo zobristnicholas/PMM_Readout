@@ -197,10 +197,13 @@ class Control(Arduino):
 
         return True
 
-    def measureAnalog(self, duration=2):
+    def measureAnalog(self, pin=0, duration=2):
         '''
-        Read voltage of analog pin 1 for a duration using self.analogRead() and plot results
+        Read voltage of analog pin for a duration using self.analogRead() and plot results
         '''
+
+        if not isinstance(pin, int) or pin < 0 or pin > 15:
+            raise ValueError("Pin must be an integer between 0 and 15.")
 
         # array for storing pin 1 measurments
         measurements = np.array([])
@@ -218,12 +221,13 @@ class Control(Arduino):
 
             # update vcc and take measurement
             self.Vcc = self.readVcc()
-            sense_voltage = self.analogRead(self.sense_pin) * (self.Vcc / 1023)
+            sense_voltage = self.analogRead(pin) * (self.Vcc / 1023)
             measurements = np.append(measurements, sense_voltage)
 
             t2 = time()
 
         print("Measured " + str(count) + " times over " + str(t2 - t1) + " seconds.")
+        print("Average value: ", np.mean(measurements))
 
         plt.plot(measurements)
         plt.show()
@@ -1058,7 +1062,7 @@ class Control(Arduino):
         for index, value in enumerate(tqdm(binary_list, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}")):
             self.writeDAC(int(value))
             sleep(0.1)
-            voltages_real[index] = self.readDAC()
+            voltages_real[index] = np.mean([self.readDAC() for _ in range(5)])
 
         # return DAC to zero Volts
         self.writeDAC(0)
