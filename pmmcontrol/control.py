@@ -4,6 +4,7 @@ from time import sleep, time
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from scipy import stats
+from tqdm import tqdm
 
 
 class Control(Arduino):
@@ -126,11 +127,14 @@ class Control(Arduino):
         self.Vcc = self.readVcc()
         sleep(0.5)  # let Vcc equilibriate
 
+        self.voltage_correction = lambda x: x
         # ENABLE IF DAC ATTACHED
-        #self.__calibrateDACVoltage()
+        print("CALIBRATING DAC...")
+        self.calibrateDACVoltage(30)
 
         # calibrate current sense while DAC is at 0
-        self.measureOffCurrent()
+        print("MEASURING OFF CURRENT...")
+        self.measureOffCurrent(2)
 
         if self_test:
             self.testConfig()
@@ -232,6 +236,8 @@ class Control(Arduino):
         # array of voltages above/below the vcc/2 offset voltage
         diff_voltages = np.array([])
 
+        pbar = tqdm(total=100, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}")
+
         # set up timer
         t1 = time()
         t2 = t1
@@ -240,6 +246,7 @@ class Control(Arduino):
         count = 0
 
         while t2 - t1 < seconds:
+            pbar.update(((t2 - t1) / seconds) * 100 - pbar.n)
             count = count + 1
 
             # update vcc and make measurment considering the offset voltage of vcc/2 and the current
@@ -247,8 +254,12 @@ class Control(Arduino):
             self.Vcc = self.readVcc()
             sense_voltage = self.analogRead(self.sense_pin) * (self.Vcc / 1023)
             diff_voltages = np.append(diff_voltages, (sense_voltage - (self.Vcc/2)) / 50)
-
             t2 = time()
+
+        pbar.update(100 - pbar.n)
+        pbar.close()
+
+        sleep(.1)
 
         print("Measured current " + str(count) + " times over " + str(t2 - t1) + " seconds.")
 
@@ -266,16 +277,25 @@ class Control(Arduino):
 
         diff_voltages = np.array([])
 
+        pbar = tqdm(total=100, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}")
+
         # read voltages as in self.readTotalCurrent()
         t1 = time()
         t2 = t1
         count = 0
         while t2 - t1 < seconds:
+            pbar.update(((t2 - t1) / seconds) * 100 - pbar.n)
             count = count + 1
+
             self.Vcc = self.readVcc()
             sense_voltage = self.analogRead(self.sense_pin) * (self.Vcc / 1023)
             diff_voltages = np.append(diff_voltages, (sense_voltage - (self.Vcc/2)) / 50)
             t2 = time()
+
+        pbar.update(100 - pbar.n)
+        pbar.close()
+
+        sleep(.1)
 
         print("Measured current " + str(count) + " times over " + str(t2 - t1) + " seconds.")
 
@@ -407,7 +427,7 @@ class Control(Arduino):
         # enable any magnet so we can read current
         self.selectMagnet(3,3)
 
-        for v in vData:
+        for v in tqdm(vData, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
             self.setVoltage(v, True)
             #cData = np.append(cData, self.readTotalCurrent(5))
             #dacData = np.append(dacData, float(input("Vdata Measurement in V: ")))
@@ -467,7 +487,7 @@ class Control(Arduino):
         # enable any magnet so we can read current
         self.selectMagnet(3,3)
 
-        for c in cStep:
+        for c in tqdm(cStep, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
             self.setCurrent(c)
             avg, error = self.readTotalCurrentError(5)
             cData = np.append(cData, avg*1000)
@@ -512,8 +532,6 @@ class Control(Arduino):
         Measures resistors by setting the voltage and measuring current. Set saveFiles to True to s
         '''
 
-        print("MEASURING RESISTORS...")
-
         set_voltage = self.max_voltage_linear
 
         # set DAC to zero
@@ -533,7 +551,9 @@ class Control(Arduino):
 
         set_voltage=abs(set_voltage)
 
-        for row in range(0, self.rows):
+        print("MEASURING ROW RESISTORS...")
+
+        for row in tqdm(range(0, self.rows), bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
 
             # configure to measure primary resistor
             self.setHigh(self.row_primary_pins[row])
@@ -574,7 +594,9 @@ class Control(Arduino):
 
             self.setLow(self.row_auxiliary_pins[row])
 
-        for col in range(2, self.cols):
+        print("MEASURING COLUMN RESISTORS...")
+
+        for col in tqdm(range(2, self.cols), bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
 
             # configure to measure primary resistor with positive voltage
             self.setHigh(self.col_primary_pins[col])
@@ -639,7 +661,7 @@ class Control(Arduino):
         for pin in self.enable_pins:
             self.setLow(pin)
 
-        for v in vData:
+        for v in tqdm(vData, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
             if v >= 0:
                 # enable positive voltages
                 self.setHigh(self.sign_pins['positive'])
@@ -687,7 +709,7 @@ class Control(Arduino):
         cAvg = np.array([])
         cErr = np.array([])
 
-        for duration in tStep:
+        for duration in tqdm(tStep, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
             avg, err = self.readTotalCurrentError(duration)
             cAvg = np.append(cAvg, avg)
             cErr = np.append(cErr, err)
@@ -788,7 +810,9 @@ class Control(Arduino):
 
         current_max = voltage_max * self.state_effective_res
 
-        if np.abs(voltage) > voltage_max:
+        set_voltage = np.sign(voltage) * self.voltage_correction(abs(voltage))
+
+        if np.abs(set_voltage) > voltage_max:
             error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
             raise ValueError(error)
 
@@ -825,8 +849,8 @@ class Control(Arduino):
 
 
         # change enable pins if sign change is necessary
-        if (np.sign(voltage) == -1 and self.state_sign == 'positive') or \
-                (np.sign(voltage) == 1 and self.state_sign == 'negative'):
+        if (np.sign(set_voltage) == -1 and self.state_sign == 'positive') or \
+                (np.sign(set_voltage) == 1 and self.state_sign == 'negative'):
             self.setLow(self.sign_pins['positive'])
             self.setHigh(self.sign_pins['negative'])
             posDAC = False
@@ -836,12 +860,12 @@ class Control(Arduino):
             posDAC = True
 
         # set voltage on DAC
-        binary = int(np.abs(voltage)* (2**16 - 1) / self.Vcc)
+        binary = int(np.abs(set_voltage) * (2**16 - 1) / self.Vcc)
         self.writeDAC(binary)
         sleep(1)
 
         self.DAC_isPos = posDAC # keep track of sign of DAC
-        self.DAC_voltage = voltage # keep track of voltage
+        self.DAC_voltage = set_voltage # keep track of voltage
 
     def updateCurrent(self, current, allowNL=False):
         '''
@@ -889,13 +913,15 @@ class Control(Arduino):
 
         current_max = voltage_max * self.state_effective_res
 
-        if np.abs(voltage) > voltage_max:
+        set_voltage = np.sign(voltage) * self.voltage_correction(abs(voltage))
+
+        if np.abs(set_voltage) > voltage_max:
             error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
             raise ValueError(error)
 
         # change enable pins if sign change is necessary
-        if (np.sign(voltage) == -1 and self.state_sign == 'positive') or \
-                (np.sign(voltage) == 1 and self.state_sign == 'negative'):
+        if (np.sign(set_voltage) == -1 and self.state_sign == 'positive') or \
+                (np.sign(set_voltage) == 1 and self.state_sign == 'negative'):
             if self.DAC_isPos: # only change enables if DAC is set positive
                 self.setLow(self.sign_pins['positive'])
                 self.setHigh(self.sign_pins['negative'])
@@ -907,10 +933,10 @@ class Control(Arduino):
                 self.DAC_isPos = True # update state
 
         # set voltage on DAC
-        binary = int(np.abs(voltage) * (2 ** 16 - 1) / self.Vcc)
+        binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.Vcc)
         self.writeDAC(binary)
 
-        self.DAC_voltage = voltage
+        self.DAC_voltage = set_voltage
 
     def resetMagnet(self):
         '''
