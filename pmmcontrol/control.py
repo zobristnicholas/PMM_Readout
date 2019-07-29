@@ -1034,7 +1034,7 @@ class Control(Arduino):
 
         return voltage
 
-    def __calibrateDACVoltage(self):
+    def calibrateDACVoltage(self, steps=10):
         '''
         Measures the DAC nonlinearity and generates a 'linearity_correction' function for
         each row. This function compensates for the two main sources of nonlinearity:
@@ -1049,36 +1049,25 @@ class Control(Arduino):
         self.Vcc = self.readVcc()
 
         # write values to the DAC and read the result with the Arduino
-        binary_list = np.arange(0, 2**16 + 3854, 3855)
-        voltage_list = np.zeros(np.size(binary_list))
-        for index, value in enumerate(binary_list):
-            self.writeDAC(value)
+        voltage_list = np.linspace(0, self.max_voltage_linear, steps)
+        binary_list = np.array(voltage_list * ((2**16 - 1) / self.Vcc), dtype=int)
+
+        voltages_requested = binary_list * (self.Vcc / (2**16 - 1))
+        voltages_real = np.zeros(binary_list.size)
+
+        for index, value in enumerate(tqdm(binary_list, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}")):
+            self.writeDAC(int(value))
             sleep(0.1)
-            voltage_list[index] = self.readDAC()
+            voltages_real[index] = self.readDAC()
+
         # return DAC to zero Volts
         self.writeDAC(0)
 
-        # modify the read voltages to take into account DAC current nonlinearity
-        poly = [5.03514759e+19, -2.77472015e+18, 6.27230841e+16, -7.51573164e+14,
-                5.14163336e+12, -2.01184144e+10, 4.26235161e+07, -4.46109983e+04,
-                1.65115877e+01, 0.0]
-        current_correction = lambda x: np.polyval(poly, x)
-        real_voltages = [voltage_list + current_correction(voltage_list / R)
-                         for R in self.R_row]
+        self.voltage_correction = interp1d(voltages_real, voltages_requested, bounds_error=False, fill_value='extrapolate')
 
-        # change the numbers sent to the DAC to target voltages
-        target_voltages = binary_list * self.Vcc / 2**16
-
-        # create a list of linearity corrections, one for each row
-        self.linearity_correction = []
-        for index, _ in enumerate(self.R_row):
-            self.linearity_correction.append(interp1d(real_voltages[index],
-                                                      target_voltages, kind='linear'))
-
-        # record the max voltage for each row
-        self.max_voltage_linear = []
-        for voltages in real_voltages:
-            self.max_voltage_linear.append(voltages[-1])
+        linpoints = np.linspace(0, self.max_voltage_linear, 2000)
+        plt.plot(linpoints, self.voltage_correction(linpoints))
+        plt.show()
 
         return True
 
