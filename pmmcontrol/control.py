@@ -263,7 +263,7 @@ class Control(Arduino):
 
         plt.show()
 
-    def readTotalCurrent(self, seconds=10):
+    def readTotalCurrent(self, seconds=3):
         '''
         Uses current sense circuit to measure the total current flowing to ground.
         '''
@@ -304,7 +304,7 @@ class Control(Arduino):
         # apply null-current offset
         return current_avg - self.sense_offset
 
-    def readTotalCurrent_error(self, seconds=10):
+    def readTotalCurrent_error(self, seconds=3):
         '''
         Uses current sense circuit to measure the total current flowing to ground. Also returns
         standard deviation in current measurement.
@@ -1097,6 +1097,9 @@ class Control(Arduino):
 
         # return DAC to zero Volts
         self.writeDAC(0)
+
+        self.dacCalibrate_requested = voltages_requested
+        self.dacCalibrate_real = voltages_real
 
         self.voltage_correction = interp1d(voltages_real, voltages_requested, bounds_error=False, fill_value='extrapolate')
 
