@@ -1106,6 +1106,40 @@ class Control(Arduino):
 
         return True
 
+    def calibrateAnalogRead(self, vSteps=10):
+        vMin = 0
+        vMax = 4
+
+        vSet = np.linspace(vMin, vMax, vSteps)
+        vMeasured = np.array([])
+        vReal = np.array([])
+
+        self.selectMagnet(3,3)
+
+        for v in vSet:
+            print("Setting voltage to " + str(round(v, 3)) + " volts.")
+            self.setVoltage(v, True)
+            vReal = np.append(vReal, float(input("DAC voltage: ")))
+            vMeasured = np.append(vMeasured, self.readDAC())
+
+        self.setVoltage(0)
+
+        self.analogCalibrate_measured = vMeasured
+        self.analogCalibrate_real = vReal
+        self.analogCalibrate_err = np.divide((self.analogCalibrate_measured - self.analogCalibrate_real), self.analogCalibrate_real)
+
+        self.read_correction = interp1d(vMeasured, vReal, bounds_error=False, fill_value='extrapolate')
+
+        plotPoints = np.linspace(vMin, vMax, 2000)
+
+        plt.figure(1)
+        plt.plot(self.analogCalibrate_real, self.analogCalibrate_err, marker='x', linestyle='', color='blue')
+
+        plt.figure(2)
+        plt.plot(plotPoints, self.read_correction(plotPoints))
+
+        plt.show()
+
     def __chooseResistor(self, primary):
         if primary:
             return self.R_primary
