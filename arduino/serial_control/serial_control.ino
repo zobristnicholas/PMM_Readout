@@ -124,7 +124,6 @@ long readVcc() {
 
   long result = (high<<8) | low;
 
-  // calibrated scale constant for this Arduino (volt meter value / readVcc value)
   float scale_constant = 1.1 * 1023 * 1000;
 
   result = scale_constant / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
