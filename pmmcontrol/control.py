@@ -127,10 +127,33 @@ class Control(Arduino):
         self.Vcc = self.readVcc()
         sleep(0.5)  # let Vcc equilibriate
 
+        # calibrate analogRead()
+        self.analogCalibrate_real =     [0.014, 0.678, 1.342, 2.005, 2.668, 3.331, 3.994]
+        self.analogCalibrate_measured = [2.03274648e-06, 6.60656046e-01, 1.32751882e+00, 1.99253746e+00,
+                                         2.65305014e+00, 3.31033545e+00, 3.97787913e+00]
+        self.read_correction = interp1d(self.analogCalibrate_measured, self.analogCalibrate_real, bounds_error=False, fill_value='extrapolate')
+        # ENABLE TO RECALIBRATE
+        self.calibrateAnalogRead()
+
+        # voltage set calibration
         self.voltage_correction = lambda x: x
-        # ENABLE IF DAC ATTACHED
-        #print("CALIBRATING DAC...")
-        #self.calibrateDACVoltage(30)
+        self.dacCalibrate_requested = [0., 0.12061758, 0.24131088, 0.36200417, 0.48269747,
+                                       0.60339077, 0.72408406, 0.84477736, 0.96547066, 1.08616396,
+                                       1.20685725, 1.32755055, 1.44824385, 1.56893714, 1.68963044,
+                                       1.81032374, 1.93101704, 2.05171033, 2.17240363, 2.29309693,
+                                       2.41379022, 2.5344078, 2.6551011, 2.7757944, 2.89648769,
+                                       3.01718099, 3.13787429, 3.25856758, 3.37926088, 3.49995418]
+        self.dacCalibrate_real = [0.01399796, 0.12160277, 0.24386084, 0.36610753, 0.48737588,
+                                  0.60860173, 0.7286054, 0.84959858, 0.9697203, 1.09089837,
+                                  1.2121257, 1.33310381, 1.45423645, 1.57545139, 1.69646162,
+                                  1.81812531, 1.93894083, 2.06067716, 2.18287933, 2.30343979,
+                                  2.42270567, 2.54378928, 2.66577035, 2.78907185, 2.90855339,
+                                  3.0293537, 3.15240359, 3.273836, 3.39626474, 3.51735824]
+        self.voltage_correction = interp1d(self.dacCalibrate_real, self.dacCalibrate_requested, bounds_error=False,
+                                           fill_value='extrapolate')
+        # ENABLE TO RECALIBRATE
+        # print("CALIBRATING DAC...")
+        # self.calibrateDACVoltage(30)
 
         # calibrate current sense while DAC is at 0
         print("MEASURING OFF CURRENT...")
