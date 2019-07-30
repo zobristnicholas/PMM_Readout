@@ -27,6 +27,8 @@ class Arduino(object):
         self.__DAC_PIN_POWER = 13
         self.__DAC_PIN_OUTPUT = 0  # A0
 
+        self.read_correction = lambda x: x
+
         # initialize Vcc to 5V. A more accurate value can be found by calling readVcc
         self.Vcc = 5.0
 
@@ -103,9 +105,10 @@ class Arduino(object):
         '''
         Reads the value from a specified analog pin. The result is in volts.
         '''
+
         self.__sendData('6')
         self.__sendData(pin)
-        return int(self.__getData()) * self.readVcc() / 1023
+        return self.read_correction(int(float(self.__getData())) * self.readVcc() / 1023)
 
     def writeDAC(self, value):
         '''
@@ -147,11 +150,11 @@ class Arduino(object):
         board.
         '''
 
-        self.scale_constant = 4.991 / 4.9602
-        #self.scale_constant = 1
+        #self.vcc_scale = 4.991 / 4.9602
+        self.vcc_scale = 1
 
         self.__sendData('8')
-        return self.scale_constant * float(self.__getData()) / 1000.0
+        return self.vcc_scale * float(self.__getData()) / 1000.0
 
 
 
