@@ -281,7 +281,7 @@ class Control(Arduino):
         # apply null-current offset
         return current_avg - self.sense_offset
 
-    def readTotalCurrentError(self, seconds=10):
+    def readTotalCurrent_error(self, seconds=10):
         '''
         Uses current sense circuit to measure the total current flowing to ground. Also returns
         standard deviation in current measurement.
