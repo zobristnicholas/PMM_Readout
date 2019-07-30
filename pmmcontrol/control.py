@@ -222,7 +222,7 @@ class Control(Arduino):
 
             # update vcc and take measurement
             self.Vcc = self.readVcc()
-            sense_voltage = self.analogRead(pin) * (self.Vcc / 1023)
+            sense_voltage = self.analogRead(pin)
             measurements = np.append(measurements, sense_voltage)
             vcc = np.append(vcc, self.Vcc)
 
@@ -264,7 +264,7 @@ class Control(Arduino):
             # update vcc and make measurment considering the offset voltage of vcc/2 and the current
             # sense gain of 50
             self.Vcc = self.readVcc()
-            sense_voltage = self.analogRead(self.sense_pin) * (self.Vcc / 1023)
+            sense_voltage = self.analogRead(self.sense_pin)
             diff_voltages = np.append(diff_voltages, (sense_voltage - (self.Vcc/2)) / 50)
             t2 = time()
 
@@ -300,7 +300,7 @@ class Control(Arduino):
             count = count + 1
 
             self.Vcc = self.readVcc()
-            sense_voltage = self.analogRead(self.sense_pin) * (self.Vcc / 1023)
+            sense_voltage = self.analogRead(self.sense_pin)
             diff_voltages = np.append(diff_voltages, (sense_voltage - (self.Vcc/2)) / 50)
             t2 = time()
 
@@ -390,7 +390,7 @@ class Control(Arduino):
 
             # record voltage on across sense resistor using self.analogRead()
             self.Vcc = self.readVcc()
-            vsense[idx] = ((self.analogRead(self.sense_pin) * (self.Vcc / 1023)) - (self.Vcc/2)) / 50
+            vsense[idx] = ((self.analogRead(self.sense_pin)) - (self.Vcc/2)) / 50
 
             self.writeDAC(0)
 
