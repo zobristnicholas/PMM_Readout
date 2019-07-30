@@ -373,7 +373,7 @@ class Control(Arduino):
                 self.setLow(self.sign_pins['positive'])
 
             # set voltage on DAC
-            binary = int(np.abs(v) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.voltage_correction(np.abs(v)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
@@ -557,14 +557,14 @@ class Control(Arduino):
 
         print("MEASURING ROW RESISTORS...")
 
-        for row in tqdm(range(0, self.rows), bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
+        for row in range(0, self.rows):
 
             # configure to measure primary resistor
             self.setHigh(self.row_primary_pins[row])
 
             # set voltage on DAC
             self.Vcc = self.readVcc()
-            binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.voltage_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
@@ -573,7 +573,7 @@ class Control(Arduino):
             else:
                 self.row_primary_res[row] = (set_voltage * self.amp_gain) / abs(self.readTotalCurrent())
 
-            print(self.row_primary_res[row])
+            print("Row #" + str(row) + " primary: " + str(self.row_primary_res[row]) + " Ohm")
             # set DAC to zero
             self.writeDAC(0)
 
@@ -583,7 +583,7 @@ class Control(Arduino):
 
             # set voltage on DAC
             self.Vcc = self.readVcc()
-            binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.voltage_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
@@ -592,7 +592,7 @@ class Control(Arduino):
             else:
                 self.row_auxiliary_res[row] = (set_voltage * self.amp_gain) / abs(self.readTotalCurrent())
 
-            print(self.row_auxiliary_res[row])
+            print("Row #" + str(row) + " auxiliary: " + str(self.row_auxiliary_res[row]) + " Ohm")
             # set DAC to zero
             self.writeDAC(0)
 
@@ -600,14 +600,14 @@ class Control(Arduino):
 
         print("MEASURING COLUMN RESISTORS...")
 
-        for col in tqdm(range(2, self.cols), bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
+        for col in range(2, self.cols):
 
             # configure to measure primary resistor with positive voltage
             self.setHigh(self.col_primary_pins[col])
 
             # set voltage on DAC
             self.Vcc = self.readVcc()
-            binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.voltage_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
@@ -616,7 +616,7 @@ class Control(Arduino):
             else:
                 self.col_primary_res[col] = (set_voltage * self.amp_gain) / abs(self.readTotalCurrent())
 
-            print(self.col_primary_res[col])
+            print("Col #" + str(col) + " primary: " + str(self.col_primary_res[col]) + " Ohm")
             # set DAC to zero
             self.writeDAC(0)
 
@@ -625,7 +625,7 @@ class Control(Arduino):
 
             # set voltage on DAC
             self.Vcc = self.readVcc()
-            binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.voltage_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
@@ -634,7 +634,7 @@ class Control(Arduino):
             else:
                 self.col_auxiliary_res[col] = (set_voltage * self.amp_gain) / abs(self.readTotalCurrent())
 
-            print(self.col_auxiliary_res[col])
+            print("Col #" + str(col) + " auxiliary: " + str(self.col_auxiliary_res[col]) + " Ohm")
             # set DAC to zero
             self.writeDAC(0)
 
@@ -679,7 +679,7 @@ class Control(Arduino):
 
             # set voltage on DAC
             self.Vcc = self.readVcc()
-            binary = int(np.abs(v) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.voltage_correction(np.abs(v)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
