@@ -129,8 +129,8 @@ class Control(Arduino):
 
         self.voltage_correction = lambda x: x
         # ENABLE IF DAC ATTACHED
-        print("CALIBRATING DAC...")
-        self.calibrateDACVoltage(30)
+        #print("CALIBRATING DAC...")
+        #self.calibrateDACVoltage(30)
 
         # calibrate current sense while DAC is at 0
         print("MEASURING OFF CURRENT...")
@@ -421,7 +421,7 @@ class Control(Arduino):
         print("Sense resistance: ", self.R_sense)
 
 
-    def voltageSweep(self, vSteps=10):
+    def measureVoltageSetting(self, vSteps=10):
         '''
         Utility function with skeleton made to sweep through voltages. Uses and measurements
         made can be altered.
@@ -439,7 +439,7 @@ class Control(Arduino):
         # enable any magnet so we can read current
         self.selectMagnet(3,3)
 
-        for v in tqdm(vData, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
+        for v in vData:
             self.setVoltage(v, True)
             #cData = np.append(cData, self.readTotalCurrent(5))
             #dacData = np.append(dacData, float(input("Vdata Measurement in V: ")))
@@ -484,7 +484,7 @@ class Control(Arduino):
 
         return True
 
-    def currentSweep(self, cSteps = 15):
+    def measureCurrentSetting(self, cSteps = 15):
         '''
         '''
 
@@ -656,7 +656,7 @@ class Control(Arduino):
 
         return True
 
-    def resistorVoltageSweep(self):
+    def measureResistorVoltageSweep(self):
         vMin = -self.max_voltage_linear
         vMax = self.max_voltage_linear
         vStep = 30
