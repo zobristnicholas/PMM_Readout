@@ -5,6 +5,7 @@
 // https://www.controleverything.com/content/Digital-Analog?sku=AD5667_I2CDAC#tabs-0-product_tabset-2
 
 #include<Wire.h>
+#include<RunningAverage.h>
 
 #ifndef SERIAL_RATE
 #define SERIAL_RATE         115200
@@ -23,6 +24,8 @@ int pin = 0;
 int value = 0;
 int cmd = 0;
 
+RunningAverage vcc(30);
+
 void setup()
 {
   //initialise I2C communication as Master
@@ -34,6 +37,8 @@ void setup()
 
   //set analog reference voltage
   //analogReference(INTERNAL2V56)
+
+  vcc.clear();
 
   delay(300);
 }
@@ -70,12 +75,15 @@ void loop(){
       writeDAC(); break;
     case 8 :
       //read Vcc using 1.1 V on board reference
-      Serial.println(readVcc()); break;
+      Serial.println(vcc.getAverage()); break;
     case 99:
       //just dummy to cancel the current read, needed to prevent lock
       //when the PC side dropped the "w" that we sent
       break;
   }
+
+  vcc.addValue(readVcc());
+  
 }
 
 char readData() {
