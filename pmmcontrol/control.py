@@ -21,47 +21,47 @@ class Control(Arduino):
         self.R_auxiliary = 2440
 
         self.row_primary_res = np.ones(self.rows) * self.R_primary
-        self.row_primary_res = [631.1772792021695,
-                                 634.7708524720649,
-                                 636.3071731657963,
-                                 635.7864736616807,
-                                 631.9967389507442,
-                                 635.6686595362669,
-                                 633.9018394211945,
-                                 635.5589871285589,
-                                 631.8096240732585]
+        self.row_primary_res = [632.2962870769394,
+                                 632.4036765231027,
+                                 633.5862607444412,
+                                 632.9517433473735,
+                                 632.7685036653352,
+                                 633.1074352973883,
+                                 633.2068520707134,
+                                 632.6012473297608,
+                                 632.9783127407242]
         self.row_auxiliary_res = np.ones(self.rows) * self.R_auxiliary
-        self.row_auxiliary_res = [2444.99829047598,
-                                 2447.5017403617226,
-                                 2422.05036502402,
-                                 2401.055571187328,
-                                 2422.8682056087214,
-                                 2466.3060251487805,
-                                 2423.192984508408,
-                                 2469.301657533002,
-                                 2410.9069885051554]
+        self.row_auxiliary_res = [2410.4635230082313,
+                                 2421.209877806157,
+                                 2416.6479642492814,
+                                 2415.1711800919334,
+                                 2411.461300267713,
+                                 2420.1299247700613,
+                                 2411.5541206372595,
+                                 2421.6498871446174,
+                                 2433.3276218938236]
         self.col_primary_res = np.ones(self.cols) * self.R_primary
         self.col_primary_res = [620,
                                  620,
-                                 636.2558793161181,
-                                 632.7225730161616,
-                                 639.3787057860412,
-                                 636.9955708418366,
-                                 635.1594023459376,
-                                 632.3788819184032,
-                                 640.2668339726633,
-                                 632.4916529523321]
+                                 637.4304105810651,
+                                 633.9105989605471,
+                                 635.1373803791279,
+                                 634.3898799428237,
+                                 633.9818377641924,
+                                 633.7661473341418,
+                                 635.0383050247008,
+                                 634.2186582755699]
         self.col_auxiliary_res = np.ones(self.cols) * self.R_auxiliary
         self.col_auxiliary_res = [2400,
                                  2400,
-                                 2434.877287421201,
-                                 2434.3272810670906,
-                                 2422.5984957721157,
-                                 2467.5545023330424,
-                                 2411.0988887485596,
-                                 2367.4688649879176,
-                                 2447.1814906031655,
-                                 2422.784405831128]
+                                 2420.377915774125,
+                                 2424.0900046654942,
+                                 2424.930302963896,
+                                 2421.7759407239296,
+                                 2418.584697017491,
+                                 2433.8256938560635,
+                                 2422.5800879727162,
+                                 2417.0307631229653]
 
         # value of current sense resistor
         self.R_sense = 0.11427869852558546
@@ -134,7 +134,7 @@ class Control(Arduino):
 
         # calibrate current sense while DAC is at 0
         print("MEASURING OFF CURRENT...")
-        self.measureOffCurrent(2)
+        self.measureOffCurrent(10)
 
         if self_test:
             self.testConfig()
@@ -207,6 +207,7 @@ class Control(Arduino):
 
         # array for storing pin 1 measurments
         measurements = np.array([])
+        vcc = np.array([])
 
         # set up timer
         t1 = time()
@@ -223,13 +224,20 @@ class Control(Arduino):
             self.Vcc = self.readVcc()
             sense_voltage = self.analogRead(pin) * (self.Vcc / 1023)
             measurements = np.append(measurements, sense_voltage)
+            vcc = np.append(vcc, self.Vcc)
 
             t2 = time()
 
         print("Measured " + str(count) + " times over " + str(t2 - t1) + " seconds.")
-        print("Average value: ", np.mean(measurements))
+        print("Average pin voltage: ", np.mean(measurements))
+        print("Average vcc: ", np.mean(vcc))
 
+        plt.figure(1)
         plt.plot(measurements)
+
+        plt.figure(2)
+        plt.plot(vcc)
+
         plt.show()
 
     def readTotalCurrent(self, seconds=10):
@@ -265,7 +273,7 @@ class Control(Arduino):
 
         sleep(.1)
 
-        print("Measured current " + str(count) + " times over " + str(t2 - t1) + " seconds.")
+        #print("Measured current " + str(count) + " times over " + str(t2 - t1) + " seconds.")
 
         # convert voltages to currents and get average
         current_avg = np.mean(diff_voltages / self.R_sense)
@@ -301,7 +309,7 @@ class Control(Arduino):
 
         sleep(.1)
 
-        print("Measured current " + str(count) + " times over " + str(t2 - t1) + " seconds.")
+        #print("Measured current " + str(count) + " times over " + str(t2 - t1) + " seconds.")
 
         currents = diff_voltages / self.R_sense
 
