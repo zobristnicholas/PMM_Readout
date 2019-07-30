@@ -147,9 +147,10 @@ class Arduino(object):
         voltage. Used to calibrate the max voltage that 'analogRead()' recieves from the
         board.
         '''
+        self.scale_constant = 1
 
         self.__sendData('8')
-        return float(self.__getData()) / 1000.0
+        return self.scale_constant * float(self.__getData()) / 1000.0
 
     def turnOnDAC(self):
         '''
