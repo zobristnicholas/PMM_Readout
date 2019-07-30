@@ -68,8 +68,18 @@ void loop(){
       value = readData();
       analogWrite(pin, value); break;
     case 6 :
-      //read analog value
-      Serial.println(analogRead(readData())); break;
+      {
+        //read analog value
+        int pin = readData();
+        int num = 30;
+        float sum = 0, avg;
+        for(int i = 0; i < num; i++) {
+          sum += analogRead(pin);
+          vcc.addValue(readVcc()); //continue averaging vcc during this time
+        }
+        avg = sum/num;
+        Serial.println(avg); break;
+      }
     case 7 :
       //set DAC value
       writeDAC(); break;
