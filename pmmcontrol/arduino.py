@@ -101,12 +101,11 @@ class Arduino(object):
 
     def analogRead(self, pin):
         '''
-        Reads the value from a specified analog pin. The result can be any integer from 0
-        to 1023.
+        Reads the value from a specified analog pin. The result is in volts.
         '''
         self.__sendData('6')
         self.__sendData(pin)
-        return int(self.__getData())
+        return int(self.__getData()) * self.readVcc() / 1023
 
     def writeDAC(self, value):
         '''
@@ -139,7 +138,7 @@ class Arduino(object):
         voltage range has not been changed with 'analogReference()' in serial_control.ino.
         '''
 
-        return self.analogRead(self.__DAC_PIN_OUTPUT) * self.readVcc() / 1023
+        return self.analogRead(self.__DAC_PIN_OUTPUT)
 
     def readVcc(self):
         '''
@@ -147,10 +146,14 @@ class Arduino(object):
         voltage. Used to calibrate the max voltage that 'analogRead()' recieves from the
         board.
         '''
-        self.scale_constant = 1
+
+        self.scale_constant = 4.991 / 4.9602
+        #self.scale_constant = 1
 
         self.__sendData('8')
         return self.scale_constant * float(self.__getData()) / 1000.0
+
+
 
     def turnOnDAC(self):
         '''
