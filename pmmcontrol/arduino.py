@@ -27,10 +27,11 @@ class Arduino(object):
         self._DAC_PIN_POWER = 13
         self._DAC_PIN_OUTPUT = 0  # A0
 
-        self.read_correction = lambda x: x
-
         # initialize Vcc to 5V. A more accurate value can be found by calling readVcc
         self.Vcc = 5.0
+
+        # initialize Vcc correction factor
+        self.vcc_scale = 1
 
     def __str__(self):
         return "Arduino is on port %s at %d baudrate" % (self.serial.port,
@@ -108,7 +109,7 @@ class Arduino(object):
 
         self.__sendData('6')
         self.__sendData(pin)
-        return self.read_correction(int(float(self.__getData())) * self.readVcc() / 1023)
+        return int(float(self.__getData())) * self.readVcc() / 1023
 
     def writeDAC(self, value):
         '''
@@ -149,9 +150,6 @@ class Arduino(object):
         voltage. Used to calibrate the max voltage that 'analogRead()' recieves from the
         board.
         '''
-
-        self.vcc_scale = 4.991 / 4.973
-        #self.vcc_scale = 1
 
         self.__sendData('8')
         return self.vcc_scale * float(self.__getData()) / 1000.0

@@ -123,9 +123,15 @@ class Control(Arduino):
         self.DAC_isPos = None
         self.DAC_voltage = None
 
-        # calibrate max voltage for DAC output
+        # calibrate vcc reading
+        self.vcc_scale = 4.991 / 4.973
+
         self.Vcc = self.readVcc()
         sleep(0.5)  # let Vcc equilibriate
+
+        # initialize set and read correction
+        self.set_correction = lambda x: x
+        self.read_correction = lambda x: x
 
         # calibrate analogRead()
         self.analogCalibrate_real =     [0.014, 0.678, 1.342, 2.005, 2.668, 3.331, 3.994]
@@ -136,7 +142,6 @@ class Control(Arduino):
         self.calibrateAnalogRead()
 
         # voltage set calibration
-        self.voltage_correction = lambda x: x
         self.dacCalibrate_requested = [0., 0.12061758, 0.24131088, 0.36200417, 0.48269747,
                                        0.60339077, 0.72408406, 0.84477736, 0.96547066, 1.08616396,
                                        1.20685725, 1.32755055, 1.44824385, 1.56893714, 1.68963044,
@@ -149,8 +154,8 @@ class Control(Arduino):
                                   1.81812531, 1.93894083, 2.06067716, 2.18287933, 2.30343979,
                                   2.42270567, 2.54378928, 2.66577035, 2.78907185, 2.90855339,
                                   3.0293537, 3.15240359, 3.273836, 3.39626474, 3.51735824]
-        self.voltage_correction = interp1d(self.dacCalibrate_real, self.dacCalibrate_requested, bounds_error=False,
-                                           fill_value='extrapolate')
+        self.set_correction = interp1d(self.dacCalibrate_real, self.dacCalibrate_requested, bounds_error=False,
+                                       fill_value='extrapolate')
         # ENABLE TO RECALIBRATE
         # print("CALIBRATING DAC...")
         # self.calibrateDACVoltage(30)
@@ -245,7 +250,7 @@ class Control(Arduino):
 
             # update vcc and take measurement
             self.Vcc = self.readVcc()
-            sense_voltage = self.analogRead(pin)
+            sense_voltage = self.read_correction(self.analogRead(pin))
             measurements = np.append(measurements, sense_voltage)
             vcc = np.append(vcc, self.Vcc)
 
@@ -287,7 +292,7 @@ class Control(Arduino):
             # update vcc and make measurment considering the offset voltage of vcc/2 and the current
             # sense gain of 50
             self.Vcc = self.readVcc()
-            sense_voltage = self.analogRead(self.sense_pin)
+            sense_voltage = self.read_correction(self.analogRead(self.sense_pin))
             diff_voltages = np.append(diff_voltages, (sense_voltage - (self.Vcc/2)) / 50)
             t2 = time()
 
@@ -323,7 +328,7 @@ class Control(Arduino):
             count = count + 1
 
             self.Vcc = self.readVcc()
-            sense_voltage = self.analogRead(self.sense_pin)
+            sense_voltage = self.read_correction(self.analogRead(self.sense_pin))
             diff_voltages = np.append(diff_voltages, (sense_voltage - (self.Vcc/2)) / 50)
             t2 = time()
 
@@ -404,7 +409,7 @@ class Control(Arduino):
                 self.setLow(self.sign_pins['positive'])
 
             # set voltage on DAC
-            binary = int(self.voltage_correction(np.abs(v)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(v)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
@@ -413,7 +418,7 @@ class Control(Arduino):
 
             # record voltage on across sense resistor using self.analogRead()
             self.Vcc = self.readVcc()
-            vsense[idx] = ((self.analogRead(self.sense_pin)) - (self.Vcc/2)) / 50
+            vsense[idx] = ((self.read_correction(self.analogRead(self.sense_pin))) - (self.Vcc/2)) / 50
 
             self.writeDAC(0)
 
@@ -595,7 +600,7 @@ class Control(Arduino):
 
             # set voltage on DAC
             self.Vcc = self.readVcc()
-            binary = int(self.voltage_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
@@ -614,7 +619,7 @@ class Control(Arduino):
 
             # set voltage on DAC
             self.Vcc = self.readVcc()
-            binary = int(self.voltage_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
@@ -638,7 +643,7 @@ class Control(Arduino):
 
             # set voltage on DAC
             self.Vcc = self.readVcc()
-            binary = int(self.voltage_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
@@ -656,7 +661,7 @@ class Control(Arduino):
 
             # set voltage on DAC
             self.Vcc = self.readVcc()
-            binary = int(self.voltage_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
@@ -710,7 +715,7 @@ class Control(Arduino):
 
             # set voltage on DAC
             self.Vcc = self.readVcc()
-            binary = int(self.voltage_correction(np.abs(v)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(v)) * (2 ** 16 - 1) / self.Vcc)
             self.writeDAC(binary)
             sleep(.1)
 
@@ -845,7 +850,7 @@ class Control(Arduino):
 
         current_max = voltage_max * self.state_effective_res
 
-        set_voltage = np.sign(voltage) * self.voltage_correction(abs(voltage))
+        set_voltage = np.sign(voltage) * self.set_correction(abs(voltage))
 
         if np.abs(set_voltage) > voltage_max:
             error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
@@ -948,7 +953,7 @@ class Control(Arduino):
 
         current_max = voltage_max * self.state_effective_res
 
-        set_voltage = np.sign(voltage) * self.voltage_correction(abs(voltage))
+        set_voltage = np.sign(voltage) * self.set_correction(abs(voltage))
 
         if np.abs(set_voltage) > voltage_max:
             error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
@@ -1093,7 +1098,7 @@ class Control(Arduino):
         for index, value in enumerate(tqdm(binary_list, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}")):
             self.writeDAC(int(value))
             sleep(0.1)
-            voltages_real[index] = np.mean([self.readDAC() for _ in range(5)])
+            voltages_real[index] = np.mean([self.read_correction(self.readDAC()) for _ in range(5)])
 
         # return DAC to zero Volts
         self.writeDAC(0)
@@ -1101,10 +1106,10 @@ class Control(Arduino):
         self.dacCalibrate_requested = voltages_requested
         self.dacCalibrate_real = voltages_real
 
-        self.voltage_correction = interp1d(voltages_real, voltages_requested, bounds_error=False, fill_value='extrapolate')
+        self.set_correction = interp1d(voltages_real, voltages_requested, bounds_error=False, fill_value='extrapolate')
 
         linpoints = np.linspace(0, self.max_voltage_linear, 2000)
-        plt.plot(linpoints, self.voltage_correction(linpoints))
+        plt.plot(linpoints, self.set_correction(linpoints))
         plt.show()
 
         return True
@@ -1123,7 +1128,7 @@ class Control(Arduino):
             print("Setting voltage to " + str(round(v, 3)) + " volts.")
             self.setVoltage(v, True)
             vReal = np.append(vReal, float(input("DAC voltage: ")))
-            vMeasured = np.append(vMeasured, self.readDAC())
+            vMeasured = np.append(vMeasured, self.read_correction(self.readDAC()))
 
         self.setVoltage(0)
 
