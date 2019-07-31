@@ -1141,9 +1141,3 @@ class Control(Arduino):
         plt.plot(plotPoints, self.read_correction(plotPoints))
 
         plt.show()
-
-    def __chooseResistor(self, primary):
-        if primary:
-            return self.R_primary
-        if not primary:
-            return self.R_auxiliary
