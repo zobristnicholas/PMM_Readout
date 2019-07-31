@@ -24,8 +24,8 @@ class Arduino(object):
         self.serial.write(b'99')
 
         # define DAC power pin and output read pin
-        self.__DAC_PIN_POWER = 13
-        self.__DAC_PIN_OUTPUT = 0  # A0
+        self._DAC_PIN_POWER = 13
+        self._DAC_PIN_OUTPUT = 0  # A0
 
         self.read_correction = lambda x: x
 
@@ -42,11 +42,11 @@ class Arduino(object):
         immediately following the instantiation of the class.
         '''
         # check that DAC power pin won't be overridden and add it to the pin_array
-        if self.__DAC_PIN_POWER in pin_array:
+        if self._DAC_PIN_POWER in pin_array:
             return ValueError(
                 "can't assign pin {} as output since it powers the DAC".
-                format(self.__DAC_PIN_POWER))
-        pin_array = list(pin_array) + [self.__DAC_PIN_POWER]
+                format(self._DAC_PIN_POWER))
+        pin_array = list(pin_array) + [self._DAC_PIN_POWER]
 
         # set default states
         for each_pin in pin_array:
@@ -141,7 +141,7 @@ class Arduino(object):
         voltage range has not been changed with 'analogReference()' in serial_control.ino.
         '''
 
-        return self.analogRead(self.__DAC_PIN_OUTPUT)
+        return self.analogRead(self._DAC_PIN_OUTPUT)
 
     def readVcc(self):
         '''
@@ -150,8 +150,8 @@ class Arduino(object):
         board.
         '''
 
-        #self.vcc_scale = 4.991 / 4.9602
-        self.vcc_scale = 1
+        self.vcc_scale = 4.991 / 4.973
+        #self.vcc_scale = 1
 
         self.__sendData('8')
         return self.vcc_scale * float(self.__getData()) / 1000.0
@@ -162,23 +162,23 @@ class Arduino(object):
         '''
         Turns on the DAC by supplying 5 V to __DAC_PIN_POWER.
         '''
-        self.setHigh(self.__DAC_PIN_POWER)
+        self.setHigh(self._DAC_PIN_POWER)
         return True
 
     def turnOffDAC(self):
         '''
         Turns off the DAC by grounding __DAC_PIN_POWER.
         '''
-        self.setLow(self.__DAC_PIN_POWER)
+        self.setLow(self._DAC_PIN_POWER)
         return True
 
     def resetDAC(self):
         '''
         Resets the DAC by turning the DAC off and then back on again.
         '''
-        self.setLow(self.__DAC_PIN_POWER)
+        self.setLow(self._DAC_PIN_POWER)
         sleep(0.1)
-        self.setHigh(self.__DAC_PIN_POWER)
+        self.setHigh(self._DAC_PIN_POWER)
         return True
 
     def turnOff(self):
