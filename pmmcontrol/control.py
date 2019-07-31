@@ -133,32 +133,33 @@ class Control(Arduino):
         self.set_correction = lambda x: x
         self.read_correction = lambda x: x
 
-        # calibrate analogRead()
-        self.analogCalibrate_real =     [0.014, 0.678, 1.342, 2.005, 2.668, 3.331, 3.994]
-        self.analogCalibrate_measured = [2.03274648e-06, 6.60656046e-01, 1.32751882e+00, 1.99253746e+00,
-                                         2.65305014e+00, 3.31033545e+00, 3.97787913e+00]
+        # calibrate voltage reading
+        self.analogCalibrate_real = [4.000e-03, 4.490e-01, 8.950e-01, 1.339e+00, 1.784e+00, 2.228e+00,
+                                    2.672e+00, 3.116e+00, 3.561e+00, 4.005e+00]
+        self.analogCalibrate_measured = [0.        , 0.43428808, 0.87794695, 1.32706499, 1.77513958,
+                                    2.22380124, 2.66758613, 3.11321121, 3.5579343 , 4.00145762]
         self.read_correction = interp1d(self.analogCalibrate_measured, self.analogCalibrate_real, bounds_error=False, fill_value='extrapolate')
         # ENABLE TO RECALIBRATE
-        self.calibrateAnalogRead()
+        #self.calibrateAnalogRead()
 
-        # voltage set calibration
-        self.dacCalibrate_requested = [0., 0.12061758, 0.24131088, 0.36200417, 0.48269747,
-                                       0.60339077, 0.72408406, 0.84477736, 0.96547066, 1.08616396,
-                                       1.20685725, 1.32755055, 1.44824385, 1.56893714, 1.68963044,
-                                       1.81032374, 1.93101704, 2.05171033, 2.17240363, 2.29309693,
-                                       2.41379022, 2.5344078, 2.6551011, 2.7757944, 2.89648769,
-                                       3.01718099, 3.13787429, 3.25856758, 3.37926088, 3.49995418]
-        self.dacCalibrate_real = [0.01399796, 0.12160277, 0.24386084, 0.36610753, 0.48737588,
-                                  0.60860173, 0.7286054, 0.84959858, 0.9697203, 1.09089837,
-                                  1.2121257, 1.33310381, 1.45423645, 1.57545139, 1.69646162,
-                                  1.81812531, 1.93894083, 2.06067716, 2.18287933, 2.30343979,
-                                  2.42270567, 2.54378928, 2.66577035, 2.78907185, 2.90855339,
-                                  3.0293537, 3.15240359, 3.273836, 3.39626474, 3.51735824]
+        # calibrate voltage setting
+        self.dacCalibrate_requested = [0.        , 0.1206742 , 0.24134841, 0.36202261, 0.48269682,
+                                       0.60344701, 0.72412122, 0.84479542, 0.96546962, 1.08614383,
+                                       1.20689402, 1.32756823, 1.44824243, 1.56891663, 1.68959084,
+                                       1.81034103, 1.93101524, 2.05168944, 2.17236365, 2.29303785,
+                                       2.41378805, 2.53446225, 2.65513645, 2.77581066, 2.89648486,
+                                       3.01723506, 3.13790926, 3.25858347, 3.37925767, 3.49993187]
+        self.dacCalibrate_real = [0.004     , 0.11405179, 0.23917311, 0.36216818, 0.48355966,
+                                   0.60630473, 0.72900813, 0.851637  , 0.97295831, 1.0898424 ,
+                                   1.20932886, 1.3300845 , 1.45124698, 1.57245087, 1.69104035,
+                                   1.8128699 , 1.93119631, 2.05200163, 2.17192156, 2.29318522,
+                                   2.41408552, 2.53297553, 2.65459621, 2.77656573, 2.89413619,
+                                   3.01496027, 3.13571349, 3.2546477 , 3.37607357, 3.49880582]
         self.set_correction = interp1d(self.dacCalibrate_real, self.dacCalibrate_requested, bounds_error=False,
                                        fill_value='extrapolate')
         # ENABLE TO RECALIBRATE
         # print("CALIBRATING DAC...")
-        # self.calibrateDACVoltage(30)
+        #self.calibrateDACSet(30)
 
         # calibrate current sense while DAC is at 0
         print("MEASURING OFF CURRENT...")
@@ -276,8 +277,6 @@ class Control(Arduino):
         # array of voltages above/below the vcc/2 offset voltage
         diff_voltages = np.array([])
 
-        pbar = tqdm(total=100, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}")
-
         # set up timer
         t1 = time()
         t2 = t1
@@ -286,18 +285,14 @@ class Control(Arduino):
         count = 0
 
         while t2 - t1 < seconds:
-            pbar.update(((t2 - t1) / seconds) * 100 - pbar.n)
             count = count + 1
 
             # update vcc and make measurment considering the offset voltage of vcc/2 and the current
             # sense gain of 50
-            self.Vcc = self.readVcc()
-            sense_voltage = self.read_correction(self.analogRead(self.sense_pin))
-            diff_voltages = np.append(diff_voltages, (sense_voltage - (self.Vcc/2)) / 50)
-            t2 = time()
 
-        pbar.update(100 - pbar.n)
-        pbar.close()
+            sense_voltage = self.read_correction(self.analogRead(self.sense_pin))
+            diff_voltages = np.append(diff_voltages, (sense_voltage - (self.readVcc()/2)) / 50)
+            t2 = time()
 
         sleep(.1)
 
@@ -317,23 +312,17 @@ class Control(Arduino):
 
         diff_voltages = np.array([])
 
-        pbar = tqdm(total=100, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}")
-
         # read voltages as in self.readTotalCurrent()
         t1 = time()
         t2 = t1
         count = 0
         while t2 - t1 < seconds:
-            pbar.update(((t2 - t1) / seconds) * 100 - pbar.n)
             count = count + 1
 
             self.Vcc = self.readVcc()
             sense_voltage = self.read_correction(self.analogRead(self.sense_pin))
             diff_voltages = np.append(diff_voltages, (sense_voltage - (self.Vcc/2)) / 50)
             t2 = time()
-
-        pbar.update(100 - pbar.n)
-        pbar.close()
 
         sleep(.1)
 
@@ -409,7 +398,7 @@ class Control(Arduino):
                 self.setLow(self.sign_pins['positive'])
 
             # set voltage on DAC
-            binary = int(self.set_correction(np.abs(v)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(v)) * (2 ** 16 - 1) / self.readVcc())
             self.writeDAC(binary)
             sleep(.1)
 
@@ -417,8 +406,7 @@ class Control(Arduino):
             current_inputs[idx] = float(input("Measured current in mA")) / 1000
 
             # record voltage on across sense resistor using self.analogRead()
-            self.Vcc = self.readVcc()
-            vsense[idx] = ((self.read_correction(self.analogRead(self.sense_pin))) - (self.Vcc/2)) / 50
+            vsense[idx] = ((self.read_correction(self.analogRead(self.sense_pin))) - (self.readVcc()/2)) / 50
 
             self.writeDAC(0)
 
@@ -1074,13 +1062,16 @@ class Control(Arduino):
 
         return voltage
 
-    def calibrateDACVoltage(self, steps=10):
+    def calibrateDACSet(self, steps=10):
         '''
         Measures the DAC nonlinearity and generates a 'linearity_correction' function for
         each row. This function compensates for the two main sources of nonlinearity:
         voltage errors and current draw errors. Needs to be run in the __init__()
         statement and assumes DAC is on, so run it after 'self.output()'.
         '''
+
+        self.set_correction = lambda x: x
+
         # ensure all switches are off
         for pin in self.enable_pins:
             self.setLow(pin)
@@ -1115,6 +1106,8 @@ class Control(Arduino):
         return True
 
     def calibrateAnalogRead(self, vSteps=10):
+        self.read_correction = lambda x: x
+
         vMin = 0
         vMax = 4
 
@@ -1129,6 +1122,7 @@ class Control(Arduino):
             self.setVoltage(v, True)
             vReal = np.append(vReal, float(input("DAC voltage: ")))
             vMeasured = np.append(vMeasured, self.read_correction(self.readDAC()))
+            print("Measured voltage: ", round(vMeasured[-1], 4))
 
         self.setVoltage(0)
 
