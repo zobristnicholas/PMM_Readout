@@ -161,8 +161,10 @@ class Control(Arduino):
         # print("CALIBRATING DAC...")
         #self.calibrateDACSet(30)
 
-        # calibrate current sense while DAC is at 0
-        print("MEASURING OFF CURRENT...")
+        # calibrate sense resistor
+        #self.measureSenseResistor()
+
+        # calibrate current sense off current
         self.measureOffCurrent(10)
 
         if self_test:
@@ -362,8 +364,6 @@ class Control(Arduino):
         is found by fitting the slope of the current - vsense plot. The input "steps" is the number of
         voltage steps to iterate through, and thus the number of current measurements that will need to be made.
         '''
-
-        print("MEASURING SENSE RESISTOR...")
 
         vMin = -self.max_voltage_linear
         vMax = self.max_voltage_linear
