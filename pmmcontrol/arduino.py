@@ -147,8 +147,8 @@ class Arduino(object):
     def readVcc(self):
         '''
         Reads the voltage powering the Arduino by measuring the 1.1 V on board reference
-        voltage. Used to calibrate the max voltage that 'analogRead()' recieves from the
-        board.
+        voltage. Used to calibrate the max voltage that 'analogRead()' receives from the
+        board. Can be calibrated by altering the factor vcc_scale.
         '''
 
         self.__sendData('8')
