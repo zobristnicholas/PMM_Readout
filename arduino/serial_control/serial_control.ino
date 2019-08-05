@@ -80,7 +80,7 @@ void loop(){
         sum = 0;
         for(int i = 0; i < num; i++) {
           sum += analogRead(pin);
-          vcc.addValue(readVcc()); //continue averaging vcc during this process
+          //vcc.addValue(readVcc()); //continue averaging vcc during this process
         }
         avg = sum/num;
         Serial.println(avg); break;
