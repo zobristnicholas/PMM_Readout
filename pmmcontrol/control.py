@@ -65,7 +65,7 @@ class Control(Arduino):
 
         # value of current sense resistor
         self.R_sense = 0.11427869852558546
-        self.nullVoltage_sense = 2.49331
+        self.nullVoltage_sense = 0.003002132467027
         self.sense_offset = -0.001147730486291547
 
         self.max_voltage = 5
@@ -127,8 +127,10 @@ class Control(Arduino):
         # calibrate vcc reading
         self.vcc_scale = 4.991 / 4.973
 
-        self.Vcc = self.readVcc()
-        sleep(0.5)  # let Vcc equilibriate
+        # let Vcc equilibriate
+        for _ in range(20):
+            self.Vcc = self.readVcc()
+        sleep(0.5)
 
         # initialize set and read correction
         self.set_correction = lambda x: x
@@ -166,8 +168,8 @@ class Control(Arduino):
         #self.measureSenseResistor()
 
         # calibrate current sense off current
-        #self.measureNullVoltage(10)
-        self.measureOffCurrent(10)
+        self.measureNullVoltage(10)
+        #self.measureOffCurrent(10)
 
         if self_test:
             self.testConfig()
@@ -255,7 +257,8 @@ class Control(Arduino):
 
             # update vcc and take measurement
             self.Vcc = self.readVcc()
-            sense_voltage = self.read_correction(self.analogRead(pin))
+            #sense_voltage = self.read_correction(self.analogRead(pin))
+            sense_voltage = 1
             measurements = np.append(measurements, sense_voltage)
             vcc = np.append(vcc, self.Vcc)
 
@@ -295,10 +298,8 @@ class Control(Arduino):
             # sense gain of 50
 
             sense_voltage = self.read_correction(self.analogRead(self.sense_pin))
-            diff_voltages = np.append(diff_voltages, (sense_voltage - (self.readVcc()/2)) / 50)
+            diff_voltages = np.append(diff_voltages, (sense_voltage - (self.readVcc()/2 - self.nullVoltage_sense)) / 50)
             t2 = time()
-
-        sleep(.1)
 
         #print("Measured current " + str(count) + " times over " + str(t2 - t1) + " seconds.")
 
@@ -306,7 +307,7 @@ class Control(Arduino):
         current_avg = np.mean(diff_voltages / self.R_sense)
 
         # apply null-current offset
-        return current_avg - self.sense_offset
+        return current_avg
 
     def readTotalCurrent_error(self, seconds=3):
         '''
@@ -322,13 +323,9 @@ class Control(Arduino):
         count = 0
         while t2 - t1 < seconds:
             count = count + 1
-
-            self.Vcc = self.readVcc()
             sense_voltage = self.read_correction(self.analogRead(self.sense_pin))
-            diff_voltages = np.append(diff_voltages, (sense_voltage - (self.Vcc/2)) / 50)
+            diff_voltages = np.append(diff_voltages, (sense_voltage - (self.readVcc()/2 - self.nullVoltage_sense)) / 50)
             t2 = time()
-
-        sleep(.1)
 
         #print("Measured current " + str(count) + " times over " + str(t2 - t1) + " seconds.")
 
@@ -339,7 +336,7 @@ class Control(Arduino):
         current_error = np.std(currents)
 
 
-        average = current_avg - self.sense_offset
+        average = current_avg
         error = current_error
 
         return (average, error)
@@ -360,11 +357,12 @@ class Control(Arduino):
 
     def measureNullVoltage(self, duration=10):
         '''
-        Find the current flowing through the current-sense when voltage is off. This will be applied
-        when measuring currents in the future.
+        Find the average difference between vcc/2 and the null-current voltage of the current-sense IC. Ideally, the
+        null-current voltage should be at vcc/2, but the voltage divider isn't perfect and there is a small amount of
+        leakage current. Usually the offset is around 3mV.con
         '''
 
-        # array for storing pin 1 measurments
+        # array for storing pin measurements
         measurements = np.array([])
         vcc = np.array([])
 
@@ -1148,6 +1146,9 @@ class Control(Arduino):
         return True
 
     def calibrateAnalogRead(self, vSteps=10):
+        '''
+        Sets voltages on arbitrary magnet
+        '''
         self.read_correction = lambda x: x
 
         vMin = 0
