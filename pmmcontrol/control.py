@@ -65,6 +65,7 @@ class Control(Arduino):
 
         # value of current sense resistor
         self.R_sense = 0.11427869852558546
+        self.nullVoltage_sense = 2.49331
         self.sense_offset = -0.001147730486291547
 
         self.max_voltage = 5
@@ -165,6 +166,7 @@ class Control(Arduino):
         #self.measureSenseResistor()
 
         # calibrate current sense off current
+        #self.measureNullVoltage(10)
         self.measureOffCurrent(10)
 
         if self_test:
@@ -342,7 +344,6 @@ class Control(Arduino):
 
         return (average, error)
 
-
     def measureOffCurrent(self, seconds=10):
         '''
         Find the current flowing through the current-sense when voltage is off. This will be applied
@@ -356,6 +357,47 @@ class Control(Arduino):
         self.sense_offset = self.readTotalCurrent(seconds)
 
         return True
+
+    def measureNullVoltage(self, duration=10):
+        '''
+        Find the current flowing through the current-sense when voltage is off. This will be applied
+        when measuring currents in the future.
+        '''
+
+        # array for storing pin 1 measurments
+        measurements = np.array([])
+        vcc = np.array([])
+
+        # set up timer
+        t1 = time()
+        t2 = t1
+
+        # keep track of how many measurements are made
+        count = 0
+
+        # timed loop
+        while t2 - t1 < duration:
+            count = count + 1
+
+            # update vcc and take measurement
+            self.Vcc = self.readVcc()
+            sense_voltage = self.read_correction(self.analogRead(self.sense_pin))
+            measurements = np.append(measurements, sense_voltage)
+            vcc = np.append(vcc, self.Vcc)
+
+            t2 = time()
+
+        nullVoltages = vcc/2 - measurements
+
+
+        print("Measured " + str(count) + " times over " + str(t2 - t1) + " seconds.")
+        print("Average pin voltage: ", np.mean(measurements))
+        print("Average vcc: ", np.mean(vcc))
+        print("Average null voltage: ", np.mean(nullVoltages))
+
+        plt.plot(nullVoltages)
+
+        plt.show()
 
     def measureSenseResistor(self, steps=10):
         '''
