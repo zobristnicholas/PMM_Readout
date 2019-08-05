@@ -13,62 +13,40 @@ class Control(Arduino):
     Class for controlling the PMM readout. Built on the Arduino class from arduino.py
     '''
     def __init__(self, port, baud_rate=115200, self_test=False):
+
+        # general configuration
+        self.data_path = "data/"
+
+        self.setCalibrationData_fname = "dac_set_calibration_data.csv"
+        self.readCalibrationData_fname = "analog_calibration_data.csv"
+        self.rowPrimData_fname = "row_primary_res_data.csv"
+        self.rowAuxData_fname = "row_auxiliary_res_data.csv"
+        self.colPrimData_fname = "col_primary_res_data.csv"
+        self.colAuxData_fname = "col_auxiliary_res_data.csv"
+
         # define number of rows and columns
         self.rows = 9
         self.cols = 10
 
-        # define resistor values
+        # initialize resistor values
         self.R_primary = 635
         self.R_auxiliary = 2440
 
         self.row_primary_res = np.ones(self.rows) * self.R_primary
-        self.row_primary_res = [632.2962870769394,
-                                 632.4036765231027,
-                                 633.5862607444412,
-                                 632.9517433473735,
-                                 632.7685036653352,
-                                 633.1074352973883,
-                                 633.2068520707134,
-                                 632.6012473297608,
-                                 632.9783127407242]
         self.row_auxiliary_res = np.ones(self.rows) * self.R_auxiliary
-        self.row_auxiliary_res = [2410.4635230082313,
-                                 2421.209877806157,
-                                 2416.6479642492814,
-                                 2415.1711800919334,
-                                 2411.461300267713,
-                                 2420.1299247700613,
-                                 2411.5541206372595,
-                                 2421.6498871446174,
-                                 2433.3276218938236]
         self.col_primary_res = np.ones(self.cols) * self.R_primary
-        self.col_primary_res = [620,
-                                 620,
-                                 637.4304105810651,
-                                 633.9105989605471,
-                                 635.1373803791279,
-                                 634.3898799428237,
-                                 633.9818377641924,
-                                 633.7661473341418,
-                                 635.0383050247008,
-                                 634.2186582755699]
         self.col_auxiliary_res = np.ones(self.cols) * self.R_auxiliary
-        self.col_auxiliary_res = [2400,
-                                 2400,
-                                 2420.377915774125,
-                                 2424.0900046654942,
-                                 2424.930302963896,
-                                 2421.7759407239296,
-                                 2418.584697017491,
-                                 2433.8256938560635,
-                                 2422.5800879727162,
-                                 2417.0307631229653]
+
+        # initialize set and read correction
+        self.set_correction = lambda x: x
+        self.read_correction = lambda x: x
 
         # value of current sense resistor
         self.R_sense = 0.11427869852558546
         self.nullVoltage_sense = 0.003002132467027
-        self.sense_offset = -0.001147730486291547
+        self.nullCurrent_sense = -0.001147730486291547
 
+        # set voltage limitations
         self.max_voltage = 5
         self.max_voltage_linear = 3.5
 
@@ -133,44 +111,57 @@ class Control(Arduino):
             self.Vcc = self.readVcc()
         sleep(0.5)
 
-        # initialize set and read correction
-        self.set_correction = lambda x: x
-        self.read_correction = lambda x: x
-
         # calibrate voltage reading
-        self.analogCalibrate_real = [4.000e-03, 4.490e-01, 8.950e-01, 1.339e+00, 1.784e+00, 2.228e+00,
-                                    2.672e+00, 3.116e+00, 3.561e+00, 4.005e+00]
-        self.analogCalibrate_measured = [0.        , 0.43428808, 0.87794695, 1.32706499, 1.77513958,
-                                    2.22380124, 2.66758613, 3.11321121, 3.5579343 , 4.00145762]
-        self.read_correction = interp1d(self.analogCalibrate_measured, self.analogCalibrate_real, bounds_error=False, fill_value='extrapolate')
-        # ENABLE TO RECALIBRATE
-        #self.calibrateAnalogRead()
+        try:
+            calibrationData_read = np.loadtxt(self.data_path + self.readCalibrationData_fname)
+            self.analogCalibrate_real = calibrationData_read[1]
+            self.analogCalibrate_measured = calibrationData_read[0]
+            self.read_correction = interp1d(self.analogCalibrate_measured, self.analogCalibrate_real, bounds_error=False, fill_value='extrapolate')
+            print("Loaded analogRead() correction data.")
+        except:
+            print("Failed to load analogRead() calibration data. Proceeding with recalibration...")
+            self.calibrateAnalogRead()
 
         # calibrate voltage setting
-        self.dacCalibrate_requested = [0.        , 0.1206742 , 0.24134841, 0.36202261, 0.48269682,
-                                       0.60344701, 0.72412122, 0.84479542, 0.96546962, 1.08614383,
-                                       1.20689402, 1.32756823, 1.44824243, 1.56891663, 1.68959084,
-                                       1.81034103, 1.93101524, 2.05168944, 2.17236365, 2.29303785,
-                                       2.41378805, 2.53446225, 2.65513645, 2.77581066, 2.89648486,
-                                       3.01723506, 3.13790926, 3.25858347, 3.37925767, 3.49993187]
-        self.dacCalibrate_real = [0.004     , 0.11405179, 0.23917311, 0.36216818, 0.48355966,
-                                   0.60630473, 0.72900813, 0.851637  , 0.97295831, 1.0898424 ,
-                                   1.20932886, 1.3300845 , 1.45124698, 1.57245087, 1.69104035,
-                                   1.8128699 , 1.93119631, 2.05200163, 2.17192156, 2.29318522,
-                                   2.41408552, 2.53297553, 2.65459621, 2.77656573, 2.89413619,
-                                   3.01496027, 3.13571349, 3.2546477 , 3.37607357, 3.49880582]
-        self.set_correction = interp1d(self.dacCalibrate_real, self.dacCalibrate_requested, bounds_error=False,
-                                       fill_value='extrapolate')
-        # ENABLE TO RECALIBRATE
-        # print("CALIBRATING DAC...")
-        #self.calibrateDACSet(30)
+        try:
+            calibrationData_set = np.loadtxt(self.data_path + self.setCalibrationData_fname)
+            self.dacCalibrate_real = calibrationData_set[0]
+            self.dacCalibrate_requested = calibrationData_set[1]
+            self.set_correction = interp1d(self.dacCalibrate_real, self.dacCalibrate_requested, bounds_error=False,
+                                           fill_value='extrapolate')
+            print("Loaded DAC setting correction data.")
+        except:
+            print("Failed to load DAC calibration data. Proceeding with recalibration...")
+            self.calibrateDACSet(30)
 
-        # calibrate sense resistor
+        # calibrate sense circuit
         #self.measureSenseResistor()
-
-        # calibrate current sense off current
         self.measureNullVoltage(10)
-        #self.measureOffCurrent(10)
+        print("Calibrated sense circuit.")
+
+        # load resistor values
+        res_failed_load = False
+        try:
+            self.row_primary_res = np.loadtxt(self.data_path + self.rowPrimData_fname)
+        except:
+            res_failed_load = True
+        try:
+            self.row_auxiliary_res = np.loadtxt(self.data_path + self.rowAuxData_fname)
+        except:
+            res_failed_load = True
+        try:
+            self.col_primary_res = np.loadtxt(self.data_path + self.colPrimData_fname)
+        except:
+            res_failed_load = True
+        try:
+            self.col_auxiliary_res = np.loadtxt(self.data_path + self.colAuxData_fname)
+        except:
+            res_failed_load = True
+        if res_failed_load:
+            print("WARNING: Failed to load some resistor data. Reverted to defaults. Resistors \
+                  can be remeasured using measureResistors()")
+        else:
+            print("Loaded all resistor values.")
 
         if self_test:
             self.testConfig()
@@ -351,8 +342,8 @@ class Control(Arduino):
         # set DAC to zero
         self.writeDAC(0)
 
-        self.sense_offset = 0
-        self.sense_offset = self.readTotalCurrent(seconds)
+        self.nullCurrent_sense = 0
+        self.nullCurrent_sense = self.readTotalCurrent(seconds)
 
         return True
 
@@ -389,14 +380,10 @@ class Control(Arduino):
         nullVoltages = vcc/2 - measurements
 
 
-        print("Measured " + str(count) + " times over " + str(t2 - t1) + " seconds.")
-        print("Average pin voltage: ", np.mean(measurements))
-        print("Average vcc: ", np.mean(vcc))
-        print("Average null voltage: ", np.mean(nullVoltages))
+        #print("Measured " + str(count) + " times over " + str(t2 - t1) + " seconds.")
 
-        plt.plot(nullVoltages)
-
-        plt.show()
+        self.nullVoltage_sense = np.mean(nullVoltages)
+        return self.nullVoltage_sense
 
     def measureSenseResistor(self, steps=10):
         '''
@@ -702,10 +689,10 @@ class Control(Arduino):
             self.setLow(self.col_auxiliary_pins[col])
 
         if overwrite:
-            self.saveData("row_primary_res_data.csv", self.row_primary_res)
-            self.saveData("row_auxiliary_res_data.csv", self.row_auxiliary_res)
-            self.saveData("col_primary_res_data.csv", self.col_primary_res)
-            self.saveData("col_auxiliary_res_data.csv", self.col_auxiliary_res)
+            self.saveData(self.rowPrimData_fname, self.row_primary_res)
+            self.saveData(self.rowAuxData_fname, self.row_auxiliary_res)
+            self.saveData(self.colPrimData_fname, self.col_primary_res)
+            self.saveData(self.colAuxData_fname, self.col_auxiliary_res)
 
         return True
 
@@ -1136,7 +1123,7 @@ class Control(Arduino):
         self.set_correction = interp1d(voltages_real, voltages_requested, bounds_error=False, fill_value='extrapolate')
 
         if overwrite:
-            self.saveData("dac_set_calibration_data.csv", [self.analogCalibrate_measured, self.analogCalibrate_real])
+            self.saveData(self.setCalibrationData_fname, [self.dacCalibrate_real, self.dacCalibrate_requested])
 
         linpoints = np.linspace(0, self.max_voltage_linear, 2000)
         plt.plot(linpoints, self.set_correction(linpoints))
@@ -1182,7 +1169,7 @@ class Control(Arduino):
         self.read_correction = interp1d(vMeasured, vReal, bounds_error=False, fill_value='extrapolate')
 
         if overwrite:
-            self.saveData("analog_calibration_data.csv", [self.analogCalibrate_measured, self.analogCalibrate_real])
+            self.saveData(self.readCalibrationData_fname, [self.analogCalibrate_measured, self.analogCalibrate_real])
 
         plotPoints = np.linspace(vMin, vMax, 2000)
 
@@ -1195,7 +1182,7 @@ class Control(Arduino):
         plt.show()
 
     def saveData(self, fname, data):
-        dirname = "data/"
+        dirname = self.data_path
         filename = fname
         pathname = dirname + filename
         if not os.path.exists(os.path.dirname(dirname)):
