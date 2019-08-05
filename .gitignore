@@ -105,3 +105,6 @@ ENV/
 extra*
 *test*
 .idea/
+
+#data
+/data
