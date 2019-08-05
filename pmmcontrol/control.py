@@ -627,8 +627,7 @@ class Control(Arduino):
             self.setHigh(self.row_primary_pins[row])
 
             # set voltage on DAC
-            self.Vcc = self.readVcc()
-            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.readVcc())
             self.writeDAC(binary)
             sleep(.1)
 
@@ -646,8 +645,7 @@ class Control(Arduino):
             self.setHigh(self.row_auxiliary_pins[row])
 
             # set voltage on DAC
-            self.Vcc = self.readVcc()
-            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.readVcc())
             self.writeDAC(binary)
             sleep(.1)
 
@@ -670,8 +668,7 @@ class Control(Arduino):
             self.setHigh(self.col_primary_pins[col])
 
             # set voltage on DAC
-            self.Vcc = self.readVcc()
-            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.readVcc())
             self.writeDAC(binary)
             sleep(.1)
 
@@ -688,8 +685,7 @@ class Control(Arduino):
             self.setHigh(self.col_auxiliary_pins[col])
 
             # set voltage on DAC
-            self.Vcc = self.readVcc()
-            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(set_voltage)) * (2 ** 16 - 1) / self.readVcc())
             self.writeDAC(binary)
             sleep(.1)
 
@@ -742,8 +738,7 @@ class Control(Arduino):
             self.setHigh(self.row_primary_pins[row])
 
             # set voltage on DAC
-            self.Vcc = self.readVcc()
-            binary = int(self.set_correction(np.abs(v)) * (2 ** 16 - 1) / self.Vcc)
+            binary = int(self.set_correction(np.abs(v)) * (2 ** 16 - 1) / self.readVcc())
             self.writeDAC(binary)
             sleep(.1)
 
@@ -928,7 +923,7 @@ class Control(Arduino):
             posDAC = True
 
         # set voltage on DAC
-        binary = int(np.abs(set_voltage) * (2**16 - 1) / self.Vcc)
+        binary = int(np.abs(set_voltage) * (2**16 - 1) / self.readVcc())
         self.writeDAC(binary)
         sleep(1)
 
@@ -1001,7 +996,7 @@ class Control(Arduino):
                 self.DAC_isPos = True # update state
 
         # set voltage on DAC
-        binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.Vcc)
+        binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.readVcc())
         self.writeDAC(binary)
 
         self.DAC_voltage = set_voltage
@@ -1119,14 +1114,11 @@ class Control(Arduino):
         for pin in self.enable_pins:
             self.setLow(pin)
 
-        # read the voltage powering arduino to appropriately rescale results
-        self.Vcc = self.readVcc()
-
         # write values to the DAC and read the result with the Arduino
         voltage_list = np.linspace(0, self.max_voltage_linear, steps)
-        binary_list = np.array(voltage_list * ((2**16 - 1) / self.Vcc), dtype=int)
+        binary_list = np.array(voltage_list * ((2**16 - 1) / self.readVcc()), dtype=int)
 
-        voltages_requested = binary_list * (self.Vcc / (2**16 - 1))
+        voltages_requested = binary_list * (self.readVcc() / (2**16 - 1))
         voltages_real = np.zeros(binary_list.size)
 
         for index, value in enumerate(tqdm(binary_list, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}")):
@@ -1158,7 +1150,7 @@ class Control(Arduino):
         vMax = 4
 
         vSet = np.linspace(vMin, vMax,vSteps)
-        bSet = np.array(vSet * ((2 ** 16 - 1) / self.Vcc), dtype=int)
+        bSet = np.array(vSet * ((2 ** 16 - 1) / self.readVcc()), dtype=int)
 
         vMeasured = np.array([])
         vReal = np.array([])
