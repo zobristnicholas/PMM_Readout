@@ -42,7 +42,7 @@ class Control(Arduino):
         self.read_correction = lambda x: x
 
         # value of current sense resistor
-        self.R_sense = 0.11427869852558546
+        self.R_sense = 0.1116028028712833
         self.nullVoltage_sense = 0.003002132467027
         self.nullCurrent_sense = -0.001147730486291547
 
@@ -103,7 +103,7 @@ class Control(Arduino):
         self.DAC_isPos = None
         self.DAC_voltage = None
 
-        # calibrate vcc reading
+        # calibrate vcc reading actual / measured
         self.vcc_scale = 4.991 / 4.973
 
         # let Vcc equilibriate
@@ -249,8 +249,7 @@ class Control(Arduino):
 
             # update vcc and take measurement
             self.Vcc = self.readVcc()
-            #sense_voltage = self.read_correction(self.analogRead(pin))
-            sense_voltage = 1
+            sense_voltage = self.read_correction(self.analogRead(pin))
             measurements = np.append(measurements, sense_voltage)
             vcc = np.append(vcc, self.Vcc)
 
@@ -434,7 +433,7 @@ class Control(Arduino):
             current_inputs[idx] = float(input("Measured current in mA")) / 1000
 
             # record voltage on across sense resistor using self.analogRead()
-            vsense[idx] = ((self.read_correction(self.analogRead(self.sense_pin))) - (self.readVcc()/2)) / 50
+            vsense[idx] = ((self.read_correction(self.analogRead(self.sense_pin))) - (self.readVcc()/2 - self.nullVoltage_sense)) / 50
 
             self.writeDAC(0)
 
@@ -1138,9 +1137,11 @@ class Control(Arduino):
         self.read_correction = lambda x: x
 
         vMin = 0
+        vDiv = 1
         vMax = 4
 
-        vSet = np.linspace(vMin, vMax,vSteps)
+        vSet = np.round(np.concatenate((np.linspace(vMin, vDiv, int((vSteps+1)/3))[:-1], np.linspace(vDiv, vMax, (vSteps+1)-int((vSteps+1)/3)))), 3)
+        print(vSet)
         bSet = np.array(vSet * ((2 ** 16 - 1) / self.readVcc()), dtype=int)
 
         vMeasured = np.array([])
@@ -1160,7 +1161,7 @@ class Control(Arduino):
             vMeasured = np.append(vMeasured, self.readDAC())
             print("Measured voltage: ", round(vMeasured[-1], 4))
 
-        self.setVoltage(0)
+        self.writeDAC(0)
 
         self.analogCalibrate_measured = vMeasured
         self.analogCalibrate_real = vReal
