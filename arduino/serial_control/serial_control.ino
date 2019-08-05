@@ -48,6 +48,9 @@ void setup()
 }
 
 void loop(){
+
+  vcc.addValue(readVcc());
+  
   switch (readData()) {
     case 1 :
       //set output pins
@@ -92,8 +95,6 @@ void loop(){
       //when the PC side dropped the "w" that we sent
       break;
   }
-
-  vcc.addValue(readVcc());
   
 }
 
