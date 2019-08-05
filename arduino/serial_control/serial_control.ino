@@ -74,6 +74,7 @@ void loop(){
     case 6 :
         //read analog value
         pin = readData();
+        sum = 0;
         for(int i = 0; i < num; i++) {
           sum += analogRead(pin);
           vcc.addValue(readVcc()); //continue averaging vcc during this process
