@@ -1166,7 +1166,7 @@ class Control(Arduino):
             print("Setting voltage to " + str(round(v, 3)) + " volts.")
             self.writeDAC(int(b))
             vReal = np.append(vReal, float(input("DAC voltage: ")))
-            vMeasured = np.append(vMeasured, self.read_correction(self.readDAC()))
+            vMeasured = np.append(vMeasured, self.readDAC())
             print("Measured voltage: ", round(vMeasured[-1], 4))
 
         self.setVoltage(0)
