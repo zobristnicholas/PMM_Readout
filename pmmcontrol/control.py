@@ -1112,6 +1112,9 @@ class Control(Arduino):
 
         self.set_correction = lambda x: x
 
+        # turn off DAC
+        self.writeDAC(0)
+
         # ensure all switches are off
         for pin in self.enable_pins:
             self.setLow(pin)
@@ -1154,15 +1157,22 @@ class Control(Arduino):
         vMin = 0
         vMax = 4
 
-        vSet = np.linspace(vMin, vMax, vSteps)
+        vSet = np.linspace(vMin, vMax,vSteps)
+        bSet = np.array(vSet * ((2 ** 16 - 1) / self.Vcc), dtype=int)
+
         vMeasured = np.array([])
         vReal = np.array([])
 
-        self.selectMagnet(3,3)
+        # turn off DAC
+        self.writeDAC(0)
 
-        for v in vSet:
+        # ensure all switches are off
+        for pin in self.enable_pins:
+            self.setLow(pin)
+
+        for b, v in zip(bSet, vSet):
             print("Setting voltage to " + str(round(v, 3)) + " volts.")
-            self.setVoltage(v, True)
+            self.writeDAC(int(b))
             vReal = np.append(vReal, float(input("DAC voltage: ")))
             vMeasured = np.append(vMeasured, self.read_correction(self.readDAC()))
             print("Measured voltage: ", round(vMeasured[-1], 4))
