@@ -24,6 +24,10 @@ int pin = 0;
 int value = 0;
 int cmd = 0;
 
+//variables for averaging
+int num = 30;
+float sum = 0, avg;
+
 RunningAverage vcc(30);
 
 void setup()
@@ -68,18 +72,14 @@ void loop(){
       value = readData();
       analogWrite(pin, value); break;
     case 6 :
-      {
         //read analog value
-        int pin = readData();
-        int num = 30;
-        float sum = 0, avg;
+        pin = readData();
         for(int i = 0; i < num; i++) {
           sum += analogRead(pin);
-          vcc.addValue(readVcc()); //continue averaging vcc during this time
+          vcc.addValue(readVcc()); //continue averaging vcc during this process
         }
         avg = sum/num;
         Serial.println(avg); break;
-      }
     case 7 :
       //set DAC value
       writeDAC(); break;
