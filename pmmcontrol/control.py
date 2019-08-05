@@ -5,6 +5,7 @@ from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from scipy import stats
 from tqdm import tqdm
+import os
 
 
 class Control(Arduino):
@@ -595,7 +596,7 @@ class Control(Arduino):
 
         return True
 
-    def measureResistors(self, saveFiles=False, manual=False):
+    def measureResistors(self, overwrite=False, manual=False):
         '''
         Measures resistors by setting the voltage and measuring current. Set saveFiles to True to s
         '''
@@ -700,11 +701,11 @@ class Control(Arduino):
 
             self.setLow(self.col_auxiliary_pins[col])
 
-        if saveFiles:
-            np.savetxt("row_primary_res.csv", self.row_primary_res)
-            np.savetxt("row_auxiliary_res.csv", self.row_auxiliary_res)
-            np.savetxt("col_primary_res.csv", self.col_primary_res)
-            np.savetxt("col_auxiliary_res.csv", self.col_auxiliary_res)
+        if overwrite:
+            self.saveData("row_primary_res_data.csv", self.row_primary_res)
+            self.saveData("row_auxiliary_res_data.csv", self.row_auxiliary_res)
+            self.saveData("col_primary_res_data.csv", self.col_primary_res)
+            self.saveData("col_auxiliary_res_data.csv", self.col_auxiliary_res)
 
         return True
 
@@ -1097,7 +1098,7 @@ class Control(Arduino):
 
         return voltage
 
-    def calibrateDACSet(self, steps=10):
+    def calibrateDACSet(self, steps=10, overwrite=True):
         '''
         Measures the DAC nonlinearity and generates a 'linearity_correction' function for
         each row. This function compensates for the two main sources of nonlinearity:
@@ -1134,13 +1135,16 @@ class Control(Arduino):
 
         self.set_correction = interp1d(voltages_real, voltages_requested, bounds_error=False, fill_value='extrapolate')
 
+        if overwrite:
+            self.saveData("dac_set_calibration_data.csv", [self.analogCalibrate_measured, self.analogCalibrate_real])
+
         linpoints = np.linspace(0, self.max_voltage_linear, 2000)
         plt.plot(linpoints, self.set_correction(linpoints))
         plt.show()
 
         return True
 
-    def calibrateAnalogRead(self, vSteps=10):
+    def calibrateAnalogRead(self, vSteps=10, overwrite=True):
         '''
         Sets voltages on arbitrary magnet
         '''
@@ -1177,6 +1181,9 @@ class Control(Arduino):
 
         self.read_correction = interp1d(vMeasured, vReal, bounds_error=False, fill_value='extrapolate')
 
+        if overwrite:
+            self.saveData("analog_calibration_data.csv", [self.analogCalibrate_measured, self.analogCalibrate_real])
+
         plotPoints = np.linspace(vMin, vMax, 2000)
 
         plt.figure(1)
@@ -1186,3 +1193,15 @@ class Control(Arduino):
         plt.plot(plotPoints, self.read_correction(plotPoints))
 
         plt.show()
+
+    def saveData(self, fname, data):
+        dirname = "data/"
+        filename = fname
+        pathname = dirname + filename
+        if not os.path.exists(os.path.dirname(dirname)):
+            try:
+                os.makedirs(os.path.dirname(dirname))
+            except:
+                print("Could  not save data to directory " + dirname)
+
+        np.savetxt(pathname, data)
