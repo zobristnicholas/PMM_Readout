@@ -42,7 +42,7 @@ class Control(Arduino):
         self.read_correction = lambda x: x
 
         # value of current sense resistor
-        self.R_sense = 0.1116028028712833
+        self.R_sense = 0.11556899686977241
         self.nullVoltage_sense = 0.003002132467027
         self.nullCurrent_sense = -0.001147730486291547
 
@@ -112,15 +112,15 @@ class Control(Arduino):
         sleep(0.5)
 
         # calibrate voltage reading
-        try:
-            calibrationData_read = np.loadtxt(self.data_path + self.readCalibrationData_fname)
-            self.analogCalibrate_real = calibrationData_read[1]
-            self.analogCalibrate_measured = calibrationData_read[0]
-            self.read_correction = interp1d(self.analogCalibrate_measured, self.analogCalibrate_real, bounds_error=False, fill_value='extrapolate')
-            print("Loaded analogRead() correction data.")
-        except:
-            print("Failed to load analogRead() calibration data. Proceeding with recalibration...")
-            self.calibrateAnalogRead()
+        #try:
+        #    calibrationData_read = np.loadtxt(self.data_path + self.readCalibrationData_fname)
+        #    self.analogCalibrate_real = calibrationData_read[1]
+        #    self.analogCalibrate_measured = calibrationData_read[0]
+        #    self.read_correction = interp1d(self.analogCalibrate_measured, self.analogCalibrate_real, bounds_error=False, fill_value='extrapolate')
+        #    print("Loaded analogRead() correction data.")
+        #except:
+        #    print("Failed to load analogRead() calibration data. Proceeding with recalibration...")
+        #    self.calibrateAnalogRead()
 
         # calibrate voltage setting
         try:
@@ -285,7 +285,7 @@ class Control(Arduino):
         while t2 - t1 < seconds:
             count = count + 1
 
-            # update vcc and make measurment considering the offset voltage of vcc/2 and the current
+            # update vcc and make measurement considering the offset voltage of vcc/2 and the current
             # sense gain of 50
 
             sense_voltage = self.read_correction(self.analogRead(self.sense_pin))
@@ -352,6 +352,8 @@ class Control(Arduino):
         null-current voltage should be at vcc/2, but the voltage divider isn't perfect and there is a small amount of
         leakage current. Usually the offset is around 3mV.con
         '''
+
+        self.nullVoltage_sense = 0
 
         # array for storing pin measurements
         measurements = np.array([])
@@ -479,6 +481,9 @@ class Control(Arduino):
         ampData_top = np.array([])
         ampData_bottom = np.array([])
 
+        #TODO measureVoltageSetting() should not need to enable a magnet. Change it so that all switches
+        # are off and voltages are set using writeDAC()
+
         # enable any magnet so we can read current
         self.selectMagnet(3,3)
 
@@ -544,7 +549,7 @@ class Control(Arduino):
 
         for c in tqdm(cStep, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
             self.setCurrent(c)
-            avg, error = self.readTotalCurrentError(5)
+            avg, error = self.readTotalCurrent_error(5)
             cData = np.append(cData, avg*1000)
             cData_percent_error = np.append(cData_percent_error, ((avg*1000-c)/c)*100)
             cData_err = np.append(cData_err, error*1000)
@@ -695,13 +700,15 @@ class Control(Arduino):
 
         return True
 
-    def measureResistorVoltageSweep(self):
+    def measureResistorVoltageSweep(self, vStep=30):
         vMin = -self.max_voltage_linear
         vMax = self.max_voltage_linear
-        vStep = 30
+        vCutoff = 0.2
 
-        vData = np.linspace(vMin, vMax, vStep)
+        vData = np.concatenate((np.linspace(vMin, -vCutoff, int(vStep/2)), np.linspace(vCutoff, vMax, int(vStep/2))))
         rData = np.array([])
+        cData = np.array([])
+        vData_read = np.array([])
 
         row = 1
 
@@ -728,11 +735,12 @@ class Control(Arduino):
             binary = int(self.set_correction(np.abs(v)) * (2 ** 16 - 1) / self.readVcc())
             self.writeDAC(binary)
             sleep(.1)
+            vData_read = np.append(vData_read, self.read_correction(self.readDAC()))
 
-            r = abs((v * self.amp_gain) / self.readTotalCurrent())
+            current = self.readTotalCurrent(1)
+            r = abs((v * self.amp_gain) / current)
             rData = np.append(rData, r)
-
-            print(r)
+            cData = np.append(cData, current)
 
             # set DAC to zero
             self.writeDAC(0)
@@ -743,12 +751,30 @@ class Control(Arduino):
         # save the data
         self.vData = vData
         self.rData = rData
+        self.cData = cData
+        self.vData_read = vData_read
 
+        plt.figure(1)
         plt.plot(self.amp_gain*vData, rData)
         plt.xlabel('Voltage [V]')
         plt.ylabel('Resistance [R]')
         plt.title('Resistor Linearity')
         plt.grid(True)
+
+        plt.figure(2)
+        plt.plot(self.amp_gain*vData, cData * 1000)
+        plt.xlabel("Voltage [V]")
+        plt.ylabel('Current [mA]')
+        plt.title('Current Linearity')
+        plt.grid(True)
+
+        plt.figure(3)
+        plt.plot(self.amp_gain*vData, self.amp_gain * vData_read)
+        plt.xlabel("Voltage [V]")
+        plt.ylabel("Read Voltage [V]")
+        plt.title('analogRead() Linearity')
+        plt.grid(True)
+
         plt.show()
 
         return True
