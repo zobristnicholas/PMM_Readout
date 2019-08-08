@@ -107,7 +107,7 @@ class Control(Arduino):
         self.vcc_scale = 1
 
         # let pins equilibriate
-        for _ in range(20):
+        for _ in range(50):
             self.Vcc = self.readVcc()
             self.analogRead(0)
             self.analogRead(1)
@@ -137,7 +137,7 @@ class Control(Arduino):
 
         # calibrate sense circuit
         #self.measureSenseResistor()
-        self.measureNullVoltage(10)
+        self.measureNullVoltage(5)
         print("Calibrated sense circuit.")
 
         # load resistor values
@@ -473,10 +473,11 @@ class Control(Arduino):
         made can be altered.
         '''
 
-        vMin = -self.max_voltage_linear
+        vMin = 0
         vMax = self.max_voltage_linear
 
         vData = np.linspace(vMin, vMax, vSteps)
+        #vData = self.dacCalibrate_real[0:3000:100].copy()
         cData = np.array([])
         dacData = np.array([])
         ampData_top = np.array([])
@@ -1132,33 +1133,70 @@ class Control(Arduino):
         voltage_list = np.linspace(0, self.max_voltage, steps)
         binary_list = np.array(voltage_list * ((2**16 - 1) / self.readVcc()), dtype=int)
 
-        voltages_real = np.array([])
-        voltages_requested = np.array([])
+        voltages_measured_smoothed = np.array([0])
+        voltages_requested_smoothed = np.array([0])
+
+        voltages_requested = np.array([0])
+        voltages_measured = np.array([0])
 
         # number of times we read a repeated voltage
         nRepeated = 0
+        nRepeatedSum = 0
+        nRepeatedAvg = 0
+
+        nJumps = 0
+
+        bottom = 0
 
         for bin in tqdm(binary_list, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
             self.writeDAC(int(bin))
             sleep(0.1)
            # measured = np.mean([self.read_correction(self.readDAC()) for _ in range(5)])
-            measured = self.read_correction(self.readDAC())
-            if not np.isin(measured, voltages_real):
-                voltages_requested = np.append(voltages_requested, bin * (self.readVcc() / (2**16 - 1)))
-                voltages_real = np.append(voltages_real, measured)
-            else:
-                nRepeated = nRepeated + 1
 
-        print("Skipped " + str(nRepeated) + " repeated measurements. If this number is high, you are probably \
-        taking to many samples.")
+            measured = self.read_correction(self.readDAC())
+            requested = bin * (self.readVcc() / (2 ** 16 - 1))
+
+            voltages_measured = np.append(voltages_measured, measured)
+            voltages_requested = np.append(voltages_requested, requested)
+
+            vPrev_measured = voltages_measured[-2]
+            vCurr_measured = voltages_measured[-1]
+            vJump_measured = vCurr_measured - vPrev_measured
+
+            nRepeated = nRepeated + 1
+
+            if vJump_measured > 0.001:
+
+                nJumps = nJumps + 1
+
+                nRepeatedSum = nRepeatedSum + nRepeated
+                nRepeated = 0
+
+                top = voltages_requested[-2]
+
+                if top != 0 and bottom != 0:
+                    #print("Top " + str(top) + ", Bottom: " + str(bottom) + ", Jump: " + str(vJump_measured) + ".")
+                    vAvg_requested = (top + bottom) / 2
+
+                    voltages_measured_smoothed = np.append(voltages_measured_smoothed, vPrev_measured)
+                    voltages_requested_smoothed = np.append(voltages_requested_smoothed, vAvg_requested)
+
+                bottom = voltages_requested[-1]
 
         # return DAC to zero Volts
         self.writeDAC(0)
 
+        print("On average " + str(nRepeatedSum / nJumps) + " data points per jump.")
+
+        # save all data points for reference
+        idx = np.argsort(voltages_measured)
+        self.dacCalibrate_requested_all = np.array(voltages_requested)[idx]
+        self.dacCalibrate_real_all = np.array(voltages_measured)[idx]
+
         # sort lists
-        idx = np.argsort(voltages_real)
-        self.dacCalibrate_requested = np.array(voltages_requested)[idx]
-        self.dacCalibrate_real = np.array(voltages_real)[idx]
+        idx = np.argsort(voltages_measured_smoothed)
+        self.dacCalibrate_requested = np.array(voltages_requested_smoothed)[idx]
+        self.dacCalibrate_real = np.array(voltages_measured_smoothed)[idx]
 
 
         self.set_correction = interp1d(self.dacCalibrate_real, self.dacCalibrate_requested, kind="linear", bounds_error=False, fill_value=(self.dacCalibrate_requested[0], self.dacCalibrate_requested[-1]))
