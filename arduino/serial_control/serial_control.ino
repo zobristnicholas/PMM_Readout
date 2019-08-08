@@ -24,11 +24,9 @@ int pin = 0;
 int value = 0;
 int cmd = 0;
 
-//variables for averaging
-int num = 30;
-float sum = 0, avg;
-
-RunningAverage vcc(30);
+RunningAverage vcc(100);
+RunningAverage a0(10);
+RunningAverage a1(10);
 
 void setup()
 {
@@ -43,13 +41,13 @@ void setup()
   //analogReference(INTERNAL2V56)
 
   vcc.clear();
+  a0.clear();
+  a1.clear();
 
   delay(300);
 }
 
 void loop(){
-
-  vcc.addValue(readVcc());
   
   switch (readData()) {
     case 1 :
@@ -77,13 +75,16 @@ void loop(){
     case 6 :
         //read analog value
         pin = readData();
-        sum = 0;
-        for(int i = 0; i < num; i++) {
-          sum += analogRead(pin);
-          //vcc.addValue(readVcc()); //continue averaging vcc during this process
+        if (pin == 0) {
+          Serial.println(a0.getAverage()); break;
         }
-        avg = sum/num;
-        Serial.println(avg); break;
+        else if (pin == 1) {
+          Serial.println(a1.getAverage()); break;
+        }       
+        else {
+          Serial.println(analogRead(pin)); break;
+        }
+        break;
     case 7 :
       //set DAC value
       writeDAC(); break;
@@ -101,6 +102,11 @@ void loop(){
 char readData() {
   Serial.println("w");
   while(1) {
+    
+    vcc.addValue(readVcc());
+    a0.addValue(analogRead(0));
+    a1.addValue(analogRead(1));
+    
     if(Serial.available() > 0) {
       return Serial.parseInt();
     }
