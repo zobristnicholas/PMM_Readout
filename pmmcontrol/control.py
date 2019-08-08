@@ -1,7 +1,7 @@
 import numpy as np
 from pmmcontrol.arduino import Arduino
 from time import sleep, time
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, InterpolatedUnivariateSpline
 import matplotlib.pyplot as plt
 from scipy import stats
 from tqdm import tqdm
@@ -47,7 +47,7 @@ class Control(Arduino):
         self.nullCurrent_sense = -0.001147730486291547
 
         # set voltage limitations
-        self.max_voltage = 5
+        self.max_voltage = 4.8
         self.max_voltage_linear = 3.5
 
         self.amp_gain = 3.01561447252416
@@ -103,12 +103,14 @@ class Control(Arduino):
         self.DAC_isPos = None
         self.DAC_voltage = None
 
-        # calibrate vcc reading actual / measured
-        self.vcc_scale = 4.991 / 4.973
+        # calibrate vcc reading actual / measured. Use if powered under 5V
+        self.vcc_scale = 1
 
-        # let Vcc equilibriate
+        # let pins equilibriate
         for _ in range(20):
             self.Vcc = self.readVcc()
+            self.analogRead(0)
+            self.analogRead(1)
         sleep(0.5)
 
         # calibrate voltage reading
@@ -127,8 +129,7 @@ class Control(Arduino):
             calibrationData_set = np.loadtxt(self.data_path + self.setCalibrationData_fname)
             self.dacCalibrate_real = calibrationData_set[0]
             self.dacCalibrate_requested = calibrationData_set[1]
-            self.set_correction = interp1d(self.dacCalibrate_real, self.dacCalibrate_requested, bounds_error=False,
-                                           fill_value='extrapolate')
+            self.set_correction = interp1d(self.dacCalibrate_real, self.dacCalibrate_requested, kind="linear", bounds_error=False, fill_value=(self.dacCalibrate_requested[0], self.dacCalibrate_requested[-1]))
             print("Loaded DAC setting correction data.")
         except:
             print("Failed to load DAC calibration data. Proceeding with recalibration...")
@@ -487,44 +488,44 @@ class Control(Arduino):
         # enable any magnet so we can read current
         self.selectMagnet(3,3)
 
-        for v in vData:
+        for v in tqdm(vData):
             self.setVoltage(v, True)
-            #cData = np.append(cData, self.readTotalCurrent(5))
-            #dacData = np.append(dacData, float(input("Vdata Measurement in V: ")))
+            #cData = np.append(cData, self.readTotalCurrent(1))
+            dacData = np.append(dacData, self.read_correction(self.readDAC()))
             #ampData_top = np.append(ampData_top, float(input("Top opamp output in V: ")))
             #ampData_bottom = np.append(ampData_bottom, float(input("Bottom opamp output in V: ")))
-            input("Voltage at " + str(v) + ", press Enter to continue...")
+            #input("Voltage at " + str(v) + ", press Enter to continue...")
 
         self.setVoltage(0)
 
         # record the data
         self.vData = vData
-        self.cData = cData
+        #self.cData = cData
         self.dacData = dacData
-        self.ampData_top = ampData_top
-        self.ampData_bottom = ampData_bottom
-        self.gain_top = abs(np.divide(self.ampData_top, self.dacData))
-        self.gain_bottom = abs(np.divide(self.ampData_bottom, self.dacData))
+        #self.ampData_top = ampData_top
+        #self.ampData_bottom = ampData_bottom
+        #self.gain_top = abs(np.divide(self.ampData_top, self.dacData))
+        #self.gain_bottom = abs(np.divide(self.ampData_bottom, self.dacData))
         self.dacErr = self.dacData-abs(self.vData)
         self.dacErr_frac = np.divide(self.dacErr, abs(self.vData))
 
-        self.amp_gain = np.mean(np.append(self.gain_bottom, self.gain_top))
+        #self.amp_gain = np.mean(np.append(self.gain_bottom, self.gain_top))
 
         plt.figure(1)
-        plt.plot(self.vData, self.dacErr_frac, marker='x', linestyle='', color='blue')
+        plt.plot(self.vData, self.dacErr_frac * 100, marker='x', linestyle='', color='blue')
         plt.ylabel('Error in DAC Voltage [%]')
         plt.xlabel('Set Voltage [V]')
         plt.title('DAC Error')
         plt.grid(True)
 
-        plt.figure(2)
-        plt.plot(self.vData, self.gain_top, label="Top Gain", marker='x', linestyle='', color='blue')
-        plt.plot(self.vData, self.gain_bottom, label="Bottom Gain", marker='x', linestyle='', color='orange')
-        plt.axhline(y=3, color='green', linestyle='-')
-        plt.ylabel("|Gain|")
-        plt.xlabel("Set Voltage [V]")
-        plt.title('Opamp Gain vs. Set Voltage')
-        plt.legend()
+        #plt.figure(2)
+        #plt.plot(self.vData, self.gain_top, label="Top Gain", marker='x', linestyle='', color='blue')
+        #plt.plot(self.vData, self.gain_bottom, label="Bottom Gain", marker='x', linestyle='', color='orange')
+        #plt.axhline(y=3, color='green', linestyle='-')
+        #plt.ylabel("|Gain|")
+        #plt.xlabel("Set Voltage [V]")
+        #plt.title('Opamp Gain vs. Set Voltage')
+        #plt.legend()
 
         plt.show()
 
@@ -703,7 +704,7 @@ class Control(Arduino):
     def measureResistorVoltageSweep(self, vStep=30):
         vMin = -self.max_voltage_linear
         vMax = self.max_voltage_linear
-        vCutoff = 0.2
+        vCutoff = .25
 
         vData = np.concatenate((np.linspace(vMin, -vCutoff, int(vStep/2)), np.linspace(vCutoff, vMax, int(vStep/2))))
         rData = np.array([])
@@ -1128,24 +1129,39 @@ class Control(Arduino):
             self.setLow(pin)
 
         # write values to the DAC and read the result with the Arduino
-        voltage_list = np.linspace(0, self.max_voltage_linear, steps)
+        voltage_list = np.linspace(0, self.max_voltage, steps)
         binary_list = np.array(voltage_list * ((2**16 - 1) / self.readVcc()), dtype=int)
 
-        voltages_requested = binary_list * (self.readVcc() / (2**16 - 1))
-        voltages_real = np.zeros(binary_list.size)
+        voltages_real = np.array([])
+        voltages_requested = np.array([])
 
-        for index, value in enumerate(tqdm(binary_list, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}")):
-            self.writeDAC(int(value))
+        # number of times we read a repeated voltage
+        nRepeated = 0
+
+        for bin in tqdm(binary_list, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
+            self.writeDAC(int(bin))
             sleep(0.1)
-            voltages_real[index] = np.mean([self.read_correction(self.readDAC()) for _ in range(5)])
+           # measured = np.mean([self.read_correction(self.readDAC()) for _ in range(5)])
+            measured = self.read_correction(self.readDAC())
+            if not np.isin(measured, voltages_real):
+                voltages_requested = np.append(voltages_requested, bin * (self.readVcc() / (2**16 - 1)))
+                voltages_real = np.append(voltages_real, measured)
+            else:
+                nRepeated = nRepeated + 1
+
+        print("Skipped " + str(nRepeated) + " repeated measurements. If this number is high, you are probably \
+        taking to many samples.")
 
         # return DAC to zero Volts
         self.writeDAC(0)
 
-        self.dacCalibrate_requested = voltages_requested
-        self.dacCalibrate_real = voltages_real
+        # sort lists
+        idx = np.argsort(voltages_real)
+        self.dacCalibrate_requested = np.array(voltages_requested)[idx]
+        self.dacCalibrate_real = np.array(voltages_real)[idx]
 
-        self.set_correction = interp1d(voltages_real, voltages_requested, bounds_error=False, fill_value='extrapolate')
+
+        self.set_correction = interp1d(self.dacCalibrate_real, self.dacCalibrate_requested, kind="linear", bounds_error=False, fill_value=(self.dacCalibrate_requested[0], self.dacCalibrate_requested[-1]))
 
         if overwrite:
             self.saveData(self.setCalibrationData_fname, [self.dacCalibrate_real, self.dacCalibrate_requested])
@@ -1189,11 +1205,14 @@ class Control(Arduino):
 
         self.writeDAC(0)
 
-        self.analogCalibrate_measured = vMeasured
-        self.analogCalibrate_real = vReal
         self.analogCalibrate_err = np.divide((self.analogCalibrate_measured - self.analogCalibrate_real), self.analogCalibrate_real)
 
-        self.read_correction = interp1d(vMeasured, vReal, bounds_error=False, fill_value='extrapolate')
+        # sort lists
+        idx = np.argsort(vMeasured)
+        self.analogCalibrate_measured = np.array(vMeasured)[idx]
+        self.analogCalibrate_real = np.array(vReal)[idx]
+
+        self.read_correction = InterpolatedUnivariateSpline(self.analogCalibrate_measured, self.analogCalibrate_real)
 
         if overwrite:
             self.saveData(self.readCalibrationData_fname, [self.analogCalibrate_measured, self.analogCalibrate_real])
