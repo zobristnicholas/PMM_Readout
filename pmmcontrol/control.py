@@ -193,7 +193,7 @@ class Control(Arduino):
                 self.selectMagnet(row, col)
 
                 # set magnet high, low, then off
-                self.setCurrent(self.max_voltage_linear)
+                self.setVoltage(self.max_voltage_linear)
                 self.maxCurrent_pos[row][col] = self.readTotalCurrent()
 
                 self.setVoltage(0)
