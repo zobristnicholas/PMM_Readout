@@ -208,8 +208,8 @@ class Control(Arduino):
         print("High test: ", self.maxCurrent_pos)
         print("Low test: ", self.maxCurrent_neg)
 
-        np.savetxt("maxCurrent_pos.csv", self.maxCurrent_pos)
-        np.savetxt("maxCurrent_neg.csv", self.maxCurrent_neg)
+        self.saveData("maxCurrent_pos.csv", self.maxCurrent_pos)
+        self.saveData("maxCurrent_neg.csv", self.maxCurrent_neg)
 
         self.maxCurrent_pos_flat = 1000 * np.delete(self.maxCurrent_pos, np.s_[0:2], 1).flatten()
         self.maxCurrent_neg_flat = np.abs(1000 * np.delete(self.maxCurrent_neg, np.s_[0:2], 1).flatten())
