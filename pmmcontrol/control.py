@@ -212,11 +212,11 @@ class Control(Arduino):
         np.savetxt("maxCurrent_neg.csv", self.maxCurrent_neg)
 
         plt.figure(1)
-        plt.plot(self.maxCurrent_pos.flatten())
+        plt.plot(self.maxCurrent_pos.flatten(), linestyle='')
         plt.title('Maximum Current')
 
         plt.figure(2)
-        plt.plot(self.maxCurrent_neg.flatten())
+        plt.plot(self.maxCurrent_neg.flatten(), linestyle='')
         plt.title('Minimum Current')
 
         plt.show()
@@ -268,7 +268,7 @@ class Control(Arduino):
 
         plt.show()
 
-    def readTotalCurrent(self, seconds=3):
+    def readTotalCurrent(self, seconds=0.1):
         '''
         Uses current sense circuit to measure the total current flowing to ground.
         '''
@@ -301,7 +301,7 @@ class Control(Arduino):
         # apply null-current offset
         return current_avg
 
-    def readTotalCurrent_error(self, seconds=3):
+    def readTotalCurrent_error(self, seconds=0.1):
         '''
         Uses current sense circuit to measure the total current flowing to ground. Also returns
         standard deviation in current measurement.
@@ -385,7 +385,11 @@ class Control(Arduino):
         #print("Measured " + str(count) + " times over " + str(t2 - t1) + " seconds.")
 
         self.nullVoltage_sense = np.mean(nullVoltages)
-        return self.nullVoltage_sense
+
+        average = self.nullVoltage_sense
+        error = np.std(nullVoltages)
+
+        return (average, error)
 
     def measureSenseResistor(self, steps=10):
         '''
@@ -540,8 +544,9 @@ class Control(Arduino):
 
         cMin = -30
         cMax = 30
+        cCutoff = 5
 
-        cStep = np.linspace(cMin, cMax, cSteps)
+        cStep = np.concatenate((np.linspace(cMin, -cCutoff, int(cSteps / 2)), np.linspace(cCutoff, cMax, int(cSteps / 2))))
         cData = np.array([])
         cData_percent_error = np.array([])
         cData_err = np.array([])
@@ -551,7 +556,7 @@ class Control(Arduino):
 
         for c in tqdm(cStep, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
             self.setCurrent(c)
-            avg, error = self.readTotalCurrent_error(5)
+            avg, error = self.readTotalCurrent_error(0.1)
             cData = np.append(cData, avg*1000)
             cData_percent_error = np.append(cData_percent_error, ((avg*1000-c)/c)*100)
             cData_err = np.append(cData_err, error*1000)
@@ -568,7 +573,9 @@ class Control(Arduino):
         slope, intercept, r_value, p_value, std_err = stats.linregress(cStep, cData)
 
         plt.figure(1)
-        plt.plot(cStep, cData_percent_error, linestyle='', marker='o', color='blue')
+        plt.plot(cStep, cData_percent_error, linestyle='', marker='.', color='blue')
+        plt.axvline(x=-cCutoff, linestyle='--', color="grey")
+        plt.axvline(x=cCutoff, linestyle='--', color="grey")
         plt.ylabel('Error in Current [%]')
         plt.xlabel('Set Current [mA]')
         plt.title('Error in Current Control')
@@ -702,17 +709,23 @@ class Control(Arduino):
 
         return True
 
-    def measureResistorVoltageSweep(self, vStep=30):
+    def measureLinearity(self, vStep=30, multi=False):
         vMin = -self.max_voltage_linear
         vMax = self.max_voltage_linear
-        vCutoff = .25
+        vCutoff = 0
 
         vData = np.concatenate((np.linspace(vMin, -vCutoff, int(vStep/2)), np.linspace(vCutoff, vMax, int(vStep/2))))
         rData = np.array([])
         cData = np.array([])
+        cData_voltages = np.array([])
         vData_read = np.array([])
 
         row = 1
+        type='Single'
+
+        if multi:
+            type = 'Multi'
+            self.selectMagnet(3,4, True, True)
 
         # set DAC to zero
         self.writeDAC(0)
@@ -722,56 +735,86 @@ class Control(Arduino):
             self.setLow(pin)
 
         for v in tqdm(vData, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
-            if v >= 0:
-                # enable positive voltages
-                self.setHigh(self.sign_pins['positive'])
-                self.setLow(self.sign_pins['negative'])
+
+            if not multi:
+                self.setLow(self.row_primary_pins[row])
+
+                if v >= 0:
+                    # enable positive voltages
+                    self.setHigh(self.sign_pins['positive'])
+                    self.setLow(self.sign_pins['negative'])
+                else:
+                    self.setHigh(self.sign_pins['negative'])
+                    self.setLow(self.sign_pins['positive'])
+
+                self.setHigh(self.row_primary_pins[row])
+
+                # set voltage on DAC
+                binary = int(self.set_correction(np.abs(v)) * (2 ** 16 - 1) / self.readVcc())
+                self.writeDAC(binary)
+                sleep(.1)
+
             else:
-                self.setHigh(self.sign_pins['negative'])
-                self.setLow(self.sign_pins['positive'])
+                self.setVoltage(v)
 
-            # configure to measure primary resistor
-            self.setHigh(self.row_primary_pins[row])
+            vRead = np.sign(v) * self.read_correction(self.readDAC())
+            vData_read = np.append(vData_read, vRead)
 
-            # set voltage on DAC
-            binary = int(self.set_correction(np.abs(v)) * (2 ** 16 - 1) / self.readVcc())
-            self.writeDAC(binary)
-            sleep(.1)
-            vData_read = np.append(vData_read, self.read_correction(self.readDAC()))
+            #current = self.readTotalCurrent(1)
 
-            current = self.readTotalCurrent(1)
-            r = abs((v * self.amp_gain) / current)
+            sense_voltage = self.read_correction(self.analogRead(self.sense_pin))
+            current = ((sense_voltage - (self.readVcc() / 2 - self.nullVoltage_sense)) / 50) / self.R_sense
+            cData_voltages = np.append(cData_voltages, sense_voltage)
+
+
+            r = abs((vRead * self.amp_gain) / current)
             rData = np.append(rData, r)
             cData = np.append(cData, current)
 
             # set DAC to zero
             self.writeDAC(0)
 
-            # configure to measure auxiliary resistor
+        if not multi:
             self.setLow(self.row_primary_pins[row])
+        else:
+            self.setVoltage(0)
+            self.deselectMagnet()
 
         # save the data
         self.vData = vData
         self.rData = rData
         self.cData = cData
         self.vData_read = vData_read
+        self.cData_voltages = cData_voltages
 
         plt.figure(1)
-        plt.plot(self.amp_gain*vData, rData)
+        plt.plot(self.amp_gain*vData, rData, marker='.', linestyle='')
         plt.xlabel('Voltage [V]')
         plt.ylabel('Resistance [R]')
         plt.title('Resistor Linearity')
         plt.grid(True)
 
         plt.figure(2)
-        plt.plot(self.amp_gain*vData, cData * 1000)
+        plt.plot(self.amp_gain*vData, cData_voltages, marker='.', linestyle='')
         plt.xlabel("Voltage [V]")
-        plt.ylabel('Current [mA]')
-        plt.title('Current Linearity')
+        plt.ylabel('Sense Voltage [mA]')
+        plt.title('Sense Voltage Linearity')
         plt.grid(True)
 
+        slope, intercept, r_value, p_value, std_err = stats.linregress(self.amp_gain * vData_read, cData * 1000)
+        points = np.linspace(self.amp_gain * vMin, self.amp_gain * vMax, 5000)
+
         plt.figure(3)
-        plt.plot(self.amp_gain*vData, self.amp_gain * vData_read)
+        plt.plot(self.amp_gain * vData_read, cData * 1000, marker='.', linestyle='', label='analogRead() Measurements')
+        plt.plot(points, intercept+slope*points, linestyle='--', color='orange', label='Linear Fit: R = {}'.format(str(round(r_value, 4))))
+        plt.xlabel("Voltage [V]")
+        plt.ylabel('Current [mA]')
+        plt.title(type + ' Channel Current Linearity with Reverse Currents')
+        plt.legend(loc='upper left')
+        plt.grid(True)
+
+        plt.figure(4)
+        plt.plot(self.amp_gain*vData, self.amp_gain * vData_read, marker='.', linestyle='')
         plt.xlabel("Voltage [V]")
         plt.ylabel("Read Voltage [V]")
         plt.title('analogRead() Linearity')
@@ -801,7 +844,7 @@ class Control(Arduino):
         plt.show()
 
 
-    def selectMagnet(self, row, column, isPrimary=True, isArrayMode=False, sign='positive'):
+    def selectMagnet(self, row, column, isArrayMode=False, sign='positive', isPrimary=True):
         '''
         Selects the magnet in (row,column) by setting the row and column switch to enable
         in either the 'positive' or 'negative' configuration, and all of the other
@@ -882,7 +925,7 @@ class Control(Arduino):
             raise ValueError("Can only set voltages in array mode if magnet has been selected as primary")
 
         if not allowNL:
-            voltage_max = self.max_voltage_linear
+            voltage_max = self.set_correction(self.max_voltage_linear)
         else:
             voltage_max = self.max_voltage
 
@@ -940,7 +983,7 @@ class Control(Arduino):
         # set voltage on DAC
         binary = int(np.abs(set_voltage) * (2**16 - 1) / self.readVcc())
         self.writeDAC(binary)
-        sleep(1)
+        sleep(0.1)
 
         self.DAC_isPos = posDAC # keep track of sign of DAC
         self.DAC_voltage = set_voltage # keep track of voltage
@@ -985,7 +1028,7 @@ class Control(Arduino):
 
 
         if not allowNL:
-            voltage_max = self.max_voltage_linear
+            voltage_max = self.set_correction(self.max_voltage_linear)
         else:
             voltage_max = self.max_voltage
 
