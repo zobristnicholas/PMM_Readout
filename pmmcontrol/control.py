@@ -211,12 +211,24 @@ class Control(Arduino):
         np.savetxt("maxCurrent_pos.csv", self.maxCurrent_pos)
         np.savetxt("maxCurrent_neg.csv", self.maxCurrent_neg)
 
+        self.maxCurrent_pos_flat = 1000 * np.delete(self.maxCurrent_pos, np.s_[0:2], 1).flatten()
+        self.maxCurrent_neg_flat = np.abs(1000 * np.delete(self.maxCurrent_neg, np.s_[0:2], 1).flatten())
+
+        posAvg = np.average(self.maxCurrent_pos_flat)
+        negAvg = np.average(self.maxCurrent_neg_flat)
+
         plt.figure(1)
-        plt.plot(self.maxCurrent_pos.flatten(), linestyle='')
-        plt.title('Maximum Current')
+        plt.plot(self.maxCurrent_pos_flat, linestyle='', marker='x', color='blue', label='Maximum Voltage')
+        plt.plot(self.maxCurrent_neg_flat, linestyle='', marker='o', color='green', label='Minimum Voltage')
+        plt.axhline(y=posAvg, linestyle='-', color='black', label="Maximum Voltage Average = {}".format(str(round(posAvg, 2))))
+        plt.axhline(y=negAvg, linestyle=':', color='black', label="Minimum Voltage Average = {}".format(str(round(negAvg, 2))))
+        plt.ylabel("|Current| mA")
+        plt.xticks([])
+        plt.legend(loc="center right")
+        plt.title('Minimum and Maximum Currents')
 
         plt.figure(2)
-        plt.plot(self.maxCurrent_neg.flatten(), linestyle='')
+        plt.plot(np.delete(self.maxCurrent_pos, np.s_[0:2], 1).flatten(), linestyle='', marker='x')
         plt.title('Minimum Current')
 
         plt.show()
