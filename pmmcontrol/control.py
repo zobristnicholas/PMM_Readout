@@ -732,19 +732,20 @@ class Control(Arduino):
         cData_voltages = np.array([])
         vData_read = np.array([])
 
-        row = 1
-        type='Single'
-
-        if multi:
+        if not multi:
             type = 'Multi'
-            self.selectMagnet(3,4, True, True)
+            self.selectMagnet(3,4, True)
+        else:
+            row = 1
+            type = 'Single'
 
-        # set DAC to zero
-        self.writeDAC(0)
+            # set DAC to zero
+            self.writeDAC(0)
 
-        # disable all switches
-        for pin in self.enable_pins:
-            self.setLow(pin)
+            # disable all switches
+            for pin in self.enable_pins:
+                self.setLow(pin)
+
 
         for v in tqdm(vData, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
 
