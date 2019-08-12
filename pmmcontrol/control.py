@@ -894,6 +894,9 @@ class Control(Arduino):
         return True
 
     def deselectMagnet(self):
+        if hasattr(self, 'state_isPrimary'):
+            self.setVoltage(0)
+
         del self.state_row
         del self.state_col
         del self.state_sign
