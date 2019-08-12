@@ -943,13 +943,15 @@ class Control(Arduino):
         if not allowNL:
             voltage_max = self.set_correction(self.max_voltage_linear)
         else:
-            voltage_max = self.max_voltage
+            voltage_max = self.set_correction(self.max_voltage)
 
         current_max = voltage_max * self.state_effective_res
 
         set_voltage = np.sign(voltage) * self.set_correction(abs(voltage))
 
         if np.abs(set_voltage) > voltage_max:
+            print("Set Voltage: ", set_voltage)
+            print("Voltage Max: ", voltage_max)
             error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
             raise ValueError(error)
 
