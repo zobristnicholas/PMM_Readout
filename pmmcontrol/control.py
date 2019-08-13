@@ -462,25 +462,44 @@ class Control(Arduino):
         for pin in self.enable_pins:
             self.setLow(pin)
 
+        # save data
+        self.current_inputs = current_inputs
+        self.vsense_data = vsense
+        rsense_fitdata = np.array([self.current_inputs, self.vsense_data])
+        self.saveData("rsense_fitdata.csv", rsense_fitdata)
+
         # fit data
-        slope, intercept, r_value, p_value, std_err = stats.linregress(vsense, current_inputs)
+        slope, intercept, r_value, p_value, std_err = stats.linregress(current_inputs, vsense)
+        f = lambda x: intercept + slope * x
 
         # compute resistance from fit
-        self.R_sense = 1/slope
+        self.R_sense = slope
+
+        # compute error in fit
+        n = np.size(self.vsense_data)
+        ssr = np.linalg.norm(self.vsense_data - f(current_inputs))**2
+        mse = ssr / (n-2)
+        stdx = np.std(self.current_inputs)
+        self.R_sense_err = np.sqrt(mse) / stdx
+
+        print("Sense resistance: ", self.R_sense)
+        print("Error: ", self.R_sense_err)
 
         # plot data and fit
-        linPoints = np.linspace(np.amin(vsense), np.amax(vsense), vSteps * 100)
-        plt.plot(vsense*1000, current_inputs*1000, marker='x', linestyle='', color='blue')
-        plt.plot(linPoints*1000, 1000*(intercept + slope * linPoints),
+        linPoints = np.linspace(np.amin(current_inputs), np.amax(current_inputs), vSteps * 100)
+        plt.plot(current_inputs*1000, vsense*1000, marker='x', linestyle='', color='blue')
+        plt.plot(linPoints*1000, 1000*f(linPoints),
                  linestyle='--', color='orange', label='Linear Fit: R = {}\nSense Resistance: {} Ohm'.format(str(round(r_value, 4)),str(round(self.R_sense, 4))))
-        plt.xlabel("Differential Sense Voltage [mV]")
-        plt.ylabel("Current [mA]")
+        plt.plot(linPoints*1000, 1000*(intercept + (slope+self.R_sense_err)*linPoints), linestyle='--', color='gray')
+        plt.plot(linPoints * 1000, 1000 * (intercept + (slope - self.R_sense_err) * linPoints), linestyle='--',
+                 color='gray', label="Slope Bounds")
+        plt.ylabel("Differential Sense Voltage [mV]")
+        plt.xlabel("Current [mA]")
         plt.title('Total Current vs. Sense Voltage')
         plt.legend()
         plt.grid()
         plt.show()
 
-        print("Sense resistance: ", self.R_sense)
 
 
     def measureVoltageSetting(self, vSteps=10):
