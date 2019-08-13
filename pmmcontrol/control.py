@@ -1029,7 +1029,7 @@ class Control(Arduino):
         if self.DAC_voltage == None:
             raise AttributeError("Initial current has not been set. " +
                                  " Run 'setCurrent()' first")
-        if not self.state_isPrimary and self.isArrayMode:
+        if not self.state_isPrimary and self.state_isArrayMode:
             raise ValueError("Can only set currents in array mode if magnet has been selected as primary")
 
         set_current = (current / 1000)
@@ -1052,14 +1052,14 @@ class Control(Arduino):
         if self.DAC_voltage == None:
             raise AttributeError("Initial voltage has not been set. " +
                                  " Run 'setVoltage()' first")
-        if not self.state_isPrimary and self.isArrayMode:
+        if not self.state_isPrimary and self.state_isArrayMode:
             raise ValueError("Can only set voltages in array mode if magnet has been selected as primary")
 
 
         if not allowNL:
             voltage_max = self.set_correction(self.max_voltage_linear)
         else:
-            voltage_max = self.max_voltage
+            voltage_max = self.set_correction(self.max_voltage)
 
         current_max = voltage_max * self.state_effective_res
 
@@ -1097,20 +1097,20 @@ class Control(Arduino):
         if not hasattr(self, 'state_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if self.isArrayMode:
+        if self.state_isArrayMode:
             raise ValueError("Can not reset magnet that has been selected in array mode. Please reselect magnet.")
 
         # set oscillating and exponentially decaying current through (row, column) magnet
         tt = np.arange(0, 70)
-        max_current = round(self.max_voltage_linear[self.state_row] /
-                            self.R_row[self.state_row], 4)
-        current_list = np.exp(-tt / 20.0) * np.cos(tt / 3.0) * max_current
-        current_list = np.append(current_list, 0)
+        max_voltage = self.max_voltage_linear
+        voltage_list = np.exp(-tt / 20.0) * np.cos(tt / 3.0) * max_voltage
+        voltage_list = np.append(voltage_list, 0)
 
         # call setCurrent() first to allow updateCurrent()
-        self.setCurrent(max_current)
-        for current in current_list:
-            self.updateCurrent(current)
+        print("Setting voltage to max (V): ", max_voltage)
+        self.setVoltage(max_voltage)
+        for v in voltage_list:
+            self.updateVoltage(v)
             sleep(0.1)
 
         return True
