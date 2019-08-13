@@ -1145,19 +1145,20 @@ class Control(Arduino):
         '''
         raise NotImplementedError
 
-    # DEPRECATED
-    def __changeSign(self):
+    def changeSign(self):
         '''
         Changes the sign of the row and column currently selected by selectMagnet.
         selectMagnet must be run first. The DAC voltage remains at 0 V until reset.
         '''
-        if hasattr(self, 'state_row') and hasattr(self, 'state_column') and \
+        if hasattr(self, 'state_row') and hasattr(self, 'state_col') and \
            hasattr(self, 'state_sign'):
             # enforce going through 0
             self.writeDAC(0)
             # disable switches
-            self.setLow(self.column_pins[self.state_col])
-            self.setLow(self.row_pins[self.state_row])
+            self.setLow(self.col_primary_pins[self.state_col])
+            self.setLow(self.col_auxiliary_pins[self.state_col])
+            self.setLow(self.row_primary_pins[self.state_row])
+            self.setLow(self.row_auxiliary_pins[self.state_row])
             self.setLow(self.sign_pins[self.state_sign])
             # switch current sign variable
             if self.state_sign == 'positive':
@@ -1165,8 +1166,10 @@ class Control(Arduino):
             else:
                 self.state_sign = 'positive'
             # enable switches
-            self.setHigh(self.column_pins[self.state_col])
-            self.setHigh(self.row_pins[self.state_row])
+            self.setHigh(self.col_primary_pins[self.state_col])
+            self.setHigh(self.col_auxiliary_pins[self.state_col])
+            self.setHigh(self.row_primary_pins[self.state_row])
+            self.setHigh(self.row_auxiliary_pins[self.state_row])
             self.setHigh(self.sign_pins[self.state_sign])
         else:
             raise AttributeError("Some attributes have not been set. " +
