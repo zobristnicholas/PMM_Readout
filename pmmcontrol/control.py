@@ -966,12 +966,12 @@ class Control(Arduino):
             error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
             raise ValueError(error)
 
+        # set DAC to zero
+        self.writeDAC(0)
+
         # disable all switches
         for pin in self.enable_pins:
             self.setLow(pin)
-
-        # set DAC to zero
-        self.writeDAC(0)
 
         # enable switches (row, column) depending on whether the magnet is primary
         if self.state_isPrimary:
