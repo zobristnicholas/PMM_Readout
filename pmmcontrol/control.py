@@ -740,7 +740,7 @@ class Control(Arduino):
 
         return True
 
-    def measureLinearity(self, vStep=30, multi=False):
+    def measureLinearity(self, vStep=30, full=False):
         vMin = -self.max_voltage_linear
         vMax = self.max_voltage_linear
         vCutoff = 0
@@ -751,43 +751,39 @@ class Control(Arduino):
         cData_voltages = np.array([])
         vData_read = np.array([])
 
-        if not multi:
-            type = 'Multi'
-            self.selectMagnet(3,4, True)
+        if full:
+            pins = np.concatenate((self.col_primary_pins, self.row_primary_pins))
+            type = 'All'
         else:
-            row = 1
+            pins = [self.row_primary_pins[0]]
             type = 'Single'
 
-            # set DAC to zero
-            self.writeDAC(0)
+        # set DAC to zero
+        self.writeDAC(0)
 
-            # disable all switches
-            for pin in self.enable_pins:
-                self.setLow(pin)
+        # disable all switches
+        for pin in self.enable_pins:
+            self.setLow(pin)
 
 
         for v in tqdm(vData, bar_format="{l_bar}{bar}|{n_fmt}/{total_fmt}{postfix}"):
 
-            if not multi:
-                self.setLow(self.row_primary_pins[row])
-
-                if v >= 0:
-                    # enable positive voltages
-                    self.setHigh(self.sign_pins['positive'])
-                    self.setLow(self.sign_pins['negative'])
-                else:
-                    self.setHigh(self.sign_pins['negative'])
-                    self.setLow(self.sign_pins['positive'])
-
-                self.setHigh(self.row_primary_pins[row])
-
-                # set voltage on DAC
-                binary = int(self.set_correction(np.abs(v)) * (2 ** 16 - 1) / self.readVcc())
-                self.writeDAC(binary)
-                sleep(.1)
-
+            if v >= 0:
+                # enable positive voltages
+                self.setHigh(self.sign_pins['positive'])
+                self.setLow(self.sign_pins['negative'])
             else:
-                self.setVoltage(v)
+                self.setHigh(self.sign_pins['negative'])
+                self.setLow(self.sign_pins['positive'])
+
+            for pin in pins:
+                self.setHigh(pin)
+
+            # set voltage on DAC
+            binary = int(self.set_correction(np.abs(v)) * (2 ** 16 - 1) / self.readVcc())
+            self.writeDAC(binary)
+            sleep(.1)
+
 
             vRead = np.sign(v) * self.read_correction(self.readDAC())
             vData_read = np.append(vData_read, vRead)
@@ -798,6 +794,8 @@ class Control(Arduino):
             current = ((sense_voltage - (self.readVcc() / 2 - self.nullVoltage_sense)) / 50) / self.R_sense
             cData_voltages = np.append(cData_voltages, sense_voltage)
 
+            for pin in pins:
+                self.setLow(pin)
 
             r = abs((vRead * self.amp_gain) / current)
             rData = np.append(rData, r)
@@ -805,12 +803,6 @@ class Control(Arduino):
 
             # set DAC to zero
             self.writeDAC(0)
-
-        if not multi:
-            self.setLow(self.row_primary_pins[row])
-        else:
-            self.setVoltage(0)
-            self.deselectMagnet()
 
         # save the data
         self.vData = vData
@@ -841,7 +833,7 @@ class Control(Arduino):
         plt.plot(points, intercept+slope*points, linestyle='--', color='orange', label='Linear Fit: R = {}'.format(str(round(r_value, 4))))
         plt.xlabel("Voltage [V]")
         plt.ylabel('Current [mA]')
-        plt.title(type + ' Channel Current Linearity with Reverse Currents')
+        plt.title(type + ' Channel Current Linearity')
         plt.legend(loc='upper left')
         plt.grid(True)
 
