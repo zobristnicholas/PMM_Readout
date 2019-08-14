@@ -45,7 +45,6 @@ class Control(Arduino):
         # value of current sense resistor
         self.R_sense = 0.11556899686977241
         self.nullVoltage_sense = 0.003002132467027
-        self.nullCurrent_sense = -0.001147730486291547
 
         # set voltage limitations
         self.max_voltage = 4.8
@@ -337,20 +336,6 @@ class Control(Arduino):
         error = current_error
 
         return (average, error)
-
-    def measureOffCurrent(self, seconds=10):
-        '''
-        Find the current flowing through the current-sense when voltage is off. This will be applied
-        when measuring currents in the future.
-        '''
-
-        # set DAC to zero
-        self.writeDAC(0)
-
-        self.nullCurrent_sense = 0
-        self.nullCurrent_sense = self.readTotalCurrent(seconds)
-
-        return True
 
     def measureNullVoltage(self, duration=10):
         '''
@@ -1165,16 +1150,6 @@ class Control(Arduino):
                                  " Run 'selectMagnet()' first")
 
         return True
-
-    def __currentToVoltage(self, current, r):
-        '''
-        Converts the requested current into a voltage required to be output by the DAC.
-        Each row has a large resistor whose value is recorded in R_row.
-        '''
-
-        voltage = r * current
-
-        return voltage
 
     def calibrateDACSet(self, steps=10, overwrite=True):
         '''
