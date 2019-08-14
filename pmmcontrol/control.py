@@ -1073,6 +1073,9 @@ class Control(Arduino):
 
         self.DAC_voltage = set_voltage
 
+    def sendWaveform(self):
+        raise NotImplementedError
+
     def resetMagnet(self):
         '''
         Removes the magnetization in the currently selected magnet by oscillating an

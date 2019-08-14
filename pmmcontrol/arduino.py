@@ -151,6 +151,11 @@ class Arduino(object):
         self.__sendData(data1)
         return True
 
+    #def writeWave(self, amp_pins: tuple, rc_state: list, bin_data: list) -> list:
+    def writeWave(self):
+        self.__sendData('9')
+        return self.__getData()
+
     def readDAC(self):
         '''
         Reads the output value of the AD 5667 DAC (controleverything.com) from
