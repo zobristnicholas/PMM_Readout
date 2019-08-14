@@ -952,9 +952,9 @@ class Control(Arduino):
             raise ValueError("Can only set voltages in array mode if magnet has been selected as primary")
 
         if not allowNL:
-            voltage_max = self.set_correction(self.max_voltage_linear)
+            voltage_max = self.set_correction(self.max_voltage_linear)[()]
         else:
-            voltage_max = self.set_correction(self.max_voltage)
+            voltage_max = self.set_correction(self.max_voltage)[()]
 
         current_max = voltage_max * self.state_effective_res
 
