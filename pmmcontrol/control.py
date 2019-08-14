@@ -1067,18 +1067,17 @@ class Control(Arduino):
             error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
             raise ValueError(error)
 
+        v_isNegative = (np.sign(set_voltage) == -1 and self.state_sign == 'positive') or \
+                (np.sign(set_voltage) == 1 and self.state_sign == 'negative')
+
         # change enable pins if sign change is necessary
-        if (np.sign(set_voltage) == -1 and self.state_sign == 'positive') or \
-                (np.sign(set_voltage) == 1 and self.state_sign == 'negative'):
-            if self.DAC_isPos: # only change enables if DAC is set positive
-                self.setLow(self.sign_pins['positive'])
-                self.setHigh(self.sign_pins['negative'])
-                self.DAC_isPos = False # update state
-        else:
-            if not self.DAC_isPos: # only change enables if DAC is set negative
-                self.setLow(self.sign_pins['negative'])
-                self.setHigh(self.sign_pins['positive'])
-                self.DAC_isPos = True # update state
+        if (v_isNegative and self.DAC_isPos) or (not v_isNegative and not self.DAC_isPos):
+                self.writeDAC(0)
+                self.setLow(self.row_primary_pins[self.state_row])
+                self.setLow(self.col_primary_pins[self.state_col])
+                self.changeSign()
+                self.setHigh(self.row_primary_pins[self.state_row])
+                self.setHigh(self.col_primary_pins[self.state_col])
 
         # set voltage on DAC
         binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.readVcc())
