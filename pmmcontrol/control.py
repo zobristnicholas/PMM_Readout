@@ -114,17 +114,6 @@ class Control(Arduino):
             self.analogRead(1)
         sleep(0.5)
 
-        # calibrate voltage reading
-        #try:
-        #    calibrationData_read = np.loadtxt(self.data_path + self.readCalibrationData_fname)
-        #    self.analogCalibrate_real = calibrationData_read[1]
-        #    self.analogCalibrate_measured = calibrationData_read[0]
-        #    self.read_correction = interp1d(self.analogCalibrate_measured, self.analogCalibrate_real, bounds_error=False, fill_value='extrapolate')
-        #    print("Loaded analogRead() correction data.")
-        #except:
-        #    print("Failed to load analogRead() calibration data. Proceeding with recalibration...")
-        #    self.calibrateAnalogRead()
-
         # calibrate voltage setting
         try:
             calibrationData_set = np.loadtxt(self.data_path + self.setCalibrationData_fname)
@@ -1073,6 +1062,7 @@ class Control(Arduino):
 
         # change enable pins if sign change is necessary
         if (v_isNegative and self.DAC_isPos) or (not v_isNegative and not self.DAC_isPos):
+                # shut off power before crossing zero to avoid voltage spikes
                 self.writeDAC(0)
                 self.setLow(self.row_primary_pins[self.state_row])
                 self.setLow(self.col_primary_pins[self.state_col])
@@ -1271,61 +1261,6 @@ class Control(Arduino):
         plt.show()
 
         return True
-
-    def calibrateAnalogRead(self, vSteps=10, overwrite=True):
-        '''
-        Sets voltages on arbitrary magnet
-        '''
-        self.read_correction = lambda x: x
-
-        vMin = 0
-        vDiv = 1
-        vMax = 4
-
-        vSet = np.round(np.concatenate((np.linspace(vMin, vDiv, int((vSteps+1)/3))[:-1], np.linspace(vDiv, vMax, (vSteps+1)-int((vSteps+1)/3)))), 3)
-        print(vSet)
-        bSet = np.array(vSet * ((2 ** 16 - 1) / self.readVcc()), dtype=int)
-
-        vMeasured = np.array([])
-        vReal = np.array([])
-
-        # turn off DAC
-        self.writeDAC(0)
-
-        # ensure all switches are off
-        for pin in self.enable_pins:
-            self.setLow(pin)
-
-        for b, v in zip(bSet, vSet):
-            print("Setting voltage to " + str(round(v, 3)) + " volts.")
-            self.writeDAC(int(b))
-            vReal = np.append(vReal, float(input("DAC voltage: ")))
-            vMeasured = np.append(vMeasured, self.readDAC())
-            print("Measured voltage: ", round(vMeasured[-1], 4))
-
-        self.writeDAC(0)
-
-        self.analogCalibrate_err = np.divide((self.analogCalibrate_measured - self.analogCalibrate_real), self.analogCalibrate_real)
-
-        # sort lists
-        idx = np.argsort(vMeasured)
-        self.analogCalibrate_measured = np.array(vMeasured)[idx]
-        self.analogCalibrate_real = np.array(vReal)[idx]
-
-        self.read_correction = InterpolatedUnivariateSpline(self.analogCalibrate_measured, self.analogCalibrate_real)
-
-        if overwrite:
-            self.saveData(self.readCalibrationData_fname, [self.analogCalibrate_measured, self.analogCalibrate_real])
-
-        plotPoints = np.linspace(vMin, vMax, 2000)
-
-        plt.figure(1)
-        plt.plot(self.analogCalibrate_real, self.analogCalibrate_err, marker='x', linestyle='', color='blue')
-
-        plt.figure(2)
-        plt.plot(plotPoints, self.read_correction(plotPoints))
-
-        plt.show()
 
     def saveData(self, fname, data):
         dirname = self.data_path
