@@ -973,6 +973,18 @@ class Control(Arduino):
         for pin in self.enable_pins:
             self.setLow(pin)
 
+        # change enable pins if sign change is necessary
+        # NECESSARY TO SWITCH AMPLIFIERS BEFORE ENABLING ANY ROWS/COLS TO AVOID VOLTAGE SPIKES
+        if (np.sign(set_voltage) == -1 and self.state_sign == 'positive') or \
+                (np.sign(set_voltage) == 1 and self.state_sign == 'negative'):
+            self.setLow(self.sign_pins['positive'])
+            self.setHigh(self.sign_pins['negative'])
+            posDAC = False
+        else:
+            self.setLow(self.sign_pins['negative'])
+            self.setHigh(self.sign_pins['positive'])
+            posDAC = True
+
         # enable switches (row, column) depending on whether the magnet is primary
         if self.state_isPrimary:
             self.setHigh(self.col_primary_pins[self.state_col])
@@ -980,8 +992,6 @@ class Control(Arduino):
         else:
             self.setHigh(self.col_auxiliary_pins[self.state_col])
             self.setHigh(self.row_auxiliary_pins[self.state_row])
-
-        self.setHigh(self.sign_pins[self.state_sign])
 
         # need to configure all other magnets if array mode is True
         if self.state_isArrayMode:
@@ -996,18 +1006,6 @@ class Control(Arduino):
                 if column_pin_auxiliary != self.col_auxiliary_pins[self.state_col]:
                     self.setLow(column_pin_primary)
                     self.setHigh(column_pin_auxiliary)
-
-
-        # change enable pins if sign change is necessary
-        if (np.sign(set_voltage) == -1 and self.state_sign == 'positive') or \
-                (np.sign(set_voltage) == 1 and self.state_sign == 'negative'):
-            self.setLow(self.sign_pins['positive'])
-            self.setHigh(self.sign_pins['negative'])
-            posDAC = False
-        else:
-            self.setLow(self.sign_pins['negative'])
-            self.setHigh(self.sign_pins['positive'])
-            posDAC = True
 
         # set voltage on DAC
         binary = int(np.abs(set_voltage) * (2**16 - 1) / self.readVcc())
