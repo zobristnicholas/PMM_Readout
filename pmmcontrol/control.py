@@ -85,8 +85,11 @@ class Control(Arduino):
         # pins for enabling positive or negative current
         self.sign_pins = {'positive': pinMap[headerMap[sign_COM['positive']]], 'negative': pinMap[headerMap[sign_COM['negative']]]}
 
+        # pins for rows and columns
+        self.rc_pins = self.row_primary_pins + self.row_auxiliary_pins + self.col_primary_pins + self.col_auxiliary_pins
+
         # all output pins enabled for use
-        self.enable_pins = self.row_primary_pins + self.row_auxiliary_pins + self.col_primary_pins + self.col_auxiliary_pins + list(self.sign_pins.values())
+        self.enable_pins = self.rc_pins + list(self.sign_pins.values())
 
         # analog pin for current sense
         self.sense_pin = 1
@@ -127,7 +130,7 @@ class Control(Arduino):
 
         # calibrate sense circuit
         #self.measureSenseResistor()
-        self.measureNullVoltage(5)
+        self.measureNullVoltage(1)
         print("Calibrated sense circuit.")
 
         # load resistor values
@@ -1057,18 +1060,27 @@ class Control(Arduino):
             error = "The maximum output is {} V per row/col which is {} mA per magnet".format(str(round(voltage_max,3)), str(round(current_max,3)))
             raise ValueError(error)
 
+        # determine if we need a negative voltage and store output as boolean
         v_isNegative = (np.sign(set_voltage) == -1 and self.state_sign == 'positive') or \
                 (np.sign(set_voltage) == 1 and self.state_sign == 'negative')
 
         # change enable pins if sign change is necessary
         if (v_isNegative and self.DAC_isPos) or (not v_isNegative and not self.DAC_isPos):
+
+                # get currently enabled rows and columns
+                rc_enabled = np.intersect1d(np.array(self.high_pins), np.array(self.rc_pins))
+
                 # shut off power before crossing zero to avoid voltage spikes
                 self.writeDAC(0)
-                self.setLow(self.row_primary_pins[self.state_row])
-                self.setLow(self.col_primary_pins[self.state_col])
+                for pin in rc_enabled:
+                    self.setLow(pin)
+
+                # cross zero
                 self.changeSign()
-                self.setHigh(self.row_primary_pins[self.state_row])
-                self.setHigh(self.col_primary_pins[self.state_col])
+
+                # re-enable previous configuration
+                for pin in rc_enabled:
+                    self.setHigh(pin)
 
         # set voltage on DAC
         binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.readVcc())
@@ -1089,9 +1101,9 @@ class Control(Arduino):
             raise ValueError("Can not reset magnet that has been selected in array mode. Please reselect magnet.")
 
         # set oscillating and exponentially decaying current through (row, column) magnet
-        tt = np.linspace(0, 6, 90)
+        tt = np.linspace(0, 9, 90)
         max_voltage = self.max_voltage_linear
-        voltage_list = np.exp(-tt / 20.0) * np.sin(tt / (3.0 / (2 * pi))) * max_voltage
+        voltage_list = np.exp(-tt / 5.0) * np.sin(tt / (3.0 / (2 * pi))) * max_voltage
         voltage_list = np.append(voltage_list, 0)
 
         # call setCurrent() first to allow updateCurrent()

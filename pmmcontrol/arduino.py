@@ -33,9 +33,17 @@ class Arduino(object):
         # initialize Vcc correction factor
         self.vcc_scale = 1
 
+        # maintain set of pins that have been set high
+        self.__high_pins = set([])
+
     def __str__(self):
         return "Arduino is on port %s at %d baudrate" % (self.serial.port,
                                                          self.serial.baudrate)
+
+    # return set of high pins as list
+    @property
+    def high_pins(self):
+        return list(self.__high_pins)
 
     def output(self, pin_array, pin_state=False):
         '''
@@ -75,6 +83,10 @@ class Arduino(object):
         '''
         self.__sendData('2')
         self.__sendData(pin)
+
+        # update list of high pins
+        self.__high_pins.discard(pin)
+
         return True
 
     def setHigh(self, pin):
@@ -83,6 +95,10 @@ class Arduino(object):
         '''
         self.__sendData('3')
         self.__sendData(pin)
+
+        # update list of high pins
+        self.__high_pins.add(pin)
+
         return True
 
     def getState(self, pin):
