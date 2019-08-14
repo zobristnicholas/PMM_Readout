@@ -1152,25 +1152,16 @@ class Control(Arduino):
         '''
         if hasattr(self, 'state_row') and hasattr(self, 'state_col') and \
            hasattr(self, 'state_sign'):
-            # enforce going through 0
-            self.writeDAC(0)
-            # disable switches
-            self.setLow(self.col_primary_pins[self.state_col])
-            self.setLow(self.col_auxiliary_pins[self.state_col])
-            self.setLow(self.row_primary_pins[self.state_row])
-            self.setLow(self.row_auxiliary_pins[self.state_row])
-            self.setLow(self.sign_pins[self.state_sign])
+
             # switch current sign variable
-            if self.state_sign == 'positive':
-                self.state_sign = 'negative'
+            if self.DAC_isPos:
+                self.setLow(self.sign_pins['positive'])
+                self.setHigh(self.sign_pins['negative'])
             else:
-                self.state_sign = 'positive'
-            # enable switches
-            self.setHigh(self.col_primary_pins[self.state_col])
-            self.setHigh(self.col_auxiliary_pins[self.state_col])
-            self.setHigh(self.row_primary_pins[self.state_row])
-            self.setHigh(self.row_auxiliary_pins[self.state_row])
-            self.setHigh(self.sign_pins[self.state_sign])
+                self.setLow(self.sign_pins['negative'])
+                self.setHigh(self.sign_pins['positive'])
+
+            self.DAC_isPos = not self.DAC_isPos
         else:
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
