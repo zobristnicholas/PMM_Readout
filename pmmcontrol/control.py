@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 from tqdm import tqdm
 import os
+from scipy.constants import pi
 
 
 class Control(Arduino):
@@ -1098,17 +1099,15 @@ class Control(Arduino):
             raise ValueError("Can not reset magnet that has been selected in array mode. Please reselect magnet.")
 
         # set oscillating and exponentially decaying current through (row, column) magnet
-        tt = np.arange(0, 70)
+        tt = np.linspace(0, 6, 90)
         max_voltage = self.max_voltage_linear
-        voltage_list = np.exp(-tt / 20.0) * np.cos(tt / 3.0) * max_voltage
+        voltage_list = np.exp(-tt / 20.0) * np.sin(tt / (3.0 / (2 * pi))) * max_voltage
         voltage_list = np.append(voltage_list, 0)
 
         # call setCurrent() first to allow updateCurrent()
-        print("Setting voltage to max (V): ", max_voltage)
-        self.setVoltage(max_voltage)
-        for v in voltage_list:
+        self.setVoltage(voltage_list[0])
+        for v in voltage_list[1:]:
             self.updateVoltage(v)
-            sleep(0.1)
 
         return True
 
