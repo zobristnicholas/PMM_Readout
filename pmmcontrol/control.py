@@ -87,8 +87,11 @@ class Control(Arduino):
         # pins for rows and columns
         self.rc_pins = self.row_primary_pins + self.row_auxiliary_pins + self.col_primary_pins + self.col_auxiliary_pins
 
+        # amplifier switching pins
+        self.amp_pins = list(self.sign_pins.values())
+
         # all output pins enabled for use
-        self.enable_pins = self.rc_pins + list(self.sign_pins.values())
+        self.enable_pins = self.rc_pins + self.amp_pins
 
         # analog pin for current sense
         self.sense_pin = 1
@@ -1076,7 +1079,7 @@ class Control(Arduino):
     def sendWaveform(self):
         raise NotImplementedError
 
-    def resetMagnet(self):
+    def resetMagnet(self, res):
         '''
         Removes the magnetization in the currently selected magnet by oscillating an
         exponentially decaying current. DAC finishes at 0V.
@@ -1089,15 +1092,15 @@ class Control(Arduino):
             raise ValueError("Can not reset magnet that has been selected in array mode. Please reselect magnet.")
 
         # set oscillating and exponentially decaying current through (row, column) magnet
-        tt = np.linspace(0, 9, 90)
+        tt = np.linspace(0, 9, res)
         max_voltage = self.max_voltage_linear
         voltage_list = np.exp(-tt / 5.0) * np.sin(tt / (3.0 / (2 * pi))) * max_voltage
         voltage_list = np.append(voltage_list, 0)
 
         # call setCurrent() first to allow updateCurrent()
         self.setVoltage(voltage_list[0])
-        for v in voltage_list[1:]:
-            self.updateVoltage(v)
+        rc_enabled = np.intersect1d(np.array(self.high_pins), np.array(self.rc_pins)).tolist()
+        self.writeWave(self.amp_pins, rc_enabled, voltage_list[1:])
 
         return True
 

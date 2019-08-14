@@ -151,11 +151,54 @@ class Arduino(object):
         self.__sendData(data1)
         return True
 
-    #def writeWave(self, amp_pins: tuple, rc_state: list, bin_data: list) -> list:
-    def writeWave(self):
-        self.__sendData('9')
-        return self.__getData()
+    def writeWave(self, amp_pins: list, rc_state: list, v_data: list) -> list:
 
+        self.__sendData('9')
+
+        # transmit amplifier pins - positive then negative
+        self.__sendData(amp_pins[0])
+        self.__sendData(amp_pins[1])
+
+        # send number of currently enabled pins
+        # only supports <128 pins
+        rc_state_size = len(rc_state)
+        self.__sendData(rc_state_size)
+
+        # send size of voltage list
+        wave_size = len(v_data)
+        wave_size_data = wave_size.to_bytes(2, 'little')
+        self.__sendData(wave_size_data[0])
+        self.__sendData(wave_size_data[1])
+
+        code = self.__getData()
+        print("CODE: ", code)
+
+        # send pins
+        # pins must be < 128
+        for pin in rc_state:
+            self.__sendData(pin)
+
+        # convert voltages to binary here
+        # check all values before beginning transmission
+
+        for voltage in v_data:
+            value = int(abs(voltage) * (2 ** 16 - 1) / 5)
+
+            sign = int(1)
+            if voltage < 0:
+                sign = int(0)
+
+            if (not isinstance(value, int)) or value < 0 or value > 2 ** 16 - 1:
+                raise ValueError('value must be an integer in [0, 65535]')
+
+            # parse hexadecimal into to two parts
+            data = value.to_bytes(2, 'little')
+
+            self.__sendData(data[0])
+            self.__sendData(data[1])
+            self.__sendData(sign)
+
+        return True
     def readDAC(self):
         '''
         Reads the output value of the AD 5667 DAC (controleverything.com) from

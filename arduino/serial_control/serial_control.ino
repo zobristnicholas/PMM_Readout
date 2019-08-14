@@ -91,6 +91,8 @@ void loop(){
     case 8 :
       //read Vcc using 1.1 V on board reference
       Serial.println(vcc.getAverage()); break;
+    case 9 :
+      writeWave(); break;
     case 99:
       //just dummy to cancel the current read, needed to prevent lock
       //when the PC side dropped the "w" that we sent
@@ -112,6 +114,136 @@ char readData() {
     }
   }
 }
+
+uint16_t readInt16() {
+  int data0 = (unsigned char)readData();
+  int data1 = (unsigned char)readData();
+
+  return (data0 + 256*data1);
+}
+
+void writeWave() {
+  int pos_pin = readData();
+  int neg_pin = readData();
+  
+  int state_size = readData();
+  
+  int wave_size = readInt16();
+  
+  // create pointers
+  int *state_list;
+  uint8_t *lsb_list;
+  uint8_t *msb_list;
+  bool *sign_list;
+  
+  // Allocate memory
+  state_list = (int *) malloc(sizeof(int) * state_size);
+  lsb_list = (uint8_t *) malloc(sizeof(uint8_t) * wave_size);
+  msb_list = (uint8_t *) malloc(sizeof(uint8_t) * wave_size);
+  sign_list = (bool *) malloc(sizeof(bool) * wave_size);
+  
+  if(!state_list || !lsb_list || !msb_list || !sign_list) {
+    Serial.println("f");
+    return;
+  } else {
+    Serial.println("s");
+  }
+
+  for (int i=0; i<state_size; i++) {
+    state_list[i] = readData();
+  }
+
+  bool sign = 1;
+  uint16_t value = 0;
+
+  uint8_t lsb = 0;
+  uint8_t msb = 0;
+  
+  for (int i=0; i<wave_size; i++) {
+    lsb = (unsigned char)readData();
+    msb = (unsigned char)readData();
+    sign = readData();
+    
+    lsb_list[i] = lsb;
+    msb_list[i] = msb;
+    sign_list[i] = sign;
+  }
+
+  bool prev_sign = sign_list[0];
+
+  // initial configuration of sign
+  if (prev_sign == true) {
+    digitalWrite(neg_pin, LOW);
+    digitalWrite(pos_pin, HIGH);
+  } else {
+    digitalWrite(pos_pin, LOW);
+    digitalWrite(neg_pin, HIGH);
+  }
+
+  uint8_t data0 = 0;
+  uint8_t data1 = 0;
+
+  for (int i=0; i<wave_size; i++) {
+    data0 = msb_list[i];
+    data1 = lsb_list[i];
+
+    // if sign change is necessary
+    if (sign_list[i] != prev_sign) {
+
+      // set DAC
+      //start I2C transmission
+      Wire.beginTransmission(DAC_ADDRESS);
+      //select DAC and input register
+      Wire.write(0x1F);
+      //write data
+      Wire.write(0);
+      Wire.write(0);
+      //stop I2C transmission
+      Wire.endTransmission();
+
+      // turn off state pins
+      for (int i=0; i<state_size; i++) {
+        digitalWrite(state_list[i], LOW);
+      }
+
+      // update sign
+      if (sign_list[i] == true) {
+        digitalWrite(neg_pin, LOW);
+        digitalWrite(pos_pin, HIGH);
+      } else {
+        digitalWrite(pos_pin, LOW);
+        digitalWrite(neg_pin, HIGH);
+      }
+
+      // turn on sign pins
+      for (int i=0; i<state_size; i++) {
+        digitalWrite(state_list[i], HIGH);
+      }
+    }
+
+    prev_sign = sign_list[i];
+
+    // set DAC
+    //start I2C transmission
+    Wire.beginTransmission(DAC_ADDRESS);
+    //select DAC and input register
+    Wire.write(0x1F);
+    //write data
+    Wire.write(data0);
+    Wire.write(data1);
+    //stop I2C transmission
+    Wire.endTransmission();
+    
+  }
+
+  free(state_list);
+  free(lsb_list);
+  free(msb_list);
+  free(sign_list);
+  
+  return;
+}
+
 
 void writeDAC() {
   //record data in two pieces
