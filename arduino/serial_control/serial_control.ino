@@ -171,7 +171,8 @@ void writeWave() {
 
   bool prev_sign = sign_list[0];
 
-  // initial configuration of sign
+  // inital sign config
+  for (int i=0; i<state_size; i++) {digitalWrite(state_list[i], LOW);}
   if (prev_sign == true) {
     digitalWrite(neg_pin, LOW);
     digitalWrite(pos_pin, HIGH);
@@ -179,6 +180,7 @@ void writeWave() {
     digitalWrite(pos_pin, LOW);
     digitalWrite(neg_pin, HIGH);
   }
+  for (int i=0; i<state_size; i++) {digitalWrite(state_list[i], HIGH);}
 
   uint8_t data0 = 0;
   uint8_t data1 = 0;
@@ -190,15 +192,11 @@ void writeWave() {
     // if sign change is necessary
     if (sign_list[i] != prev_sign) {
 
-      // set DAC
-      //start I2C transmission
+      // turn off DAC
       Wire.beginTransmission(DAC_ADDRESS);
-      //select DAC and input register
       Wire.write(0x1F);
-      //write data
       Wire.write(0);
       Wire.write(0);
-      //stop I2C transmission
       Wire.endTransmission();
 
       // turn off state pins
@@ -224,14 +222,10 @@ void writeWave() {
     prev_sign = sign_list[i];
 
     // set DAC
-    //start I2C transmission
     Wire.beginTransmission(DAC_ADDRESS);
-    //select DAC and input register
     Wire.write(0x1F);
-    //write data
     Wire.write(data0);
     Wire.write(data1);
-    //stop I2C transmission
     Wire.endTransmission();
     
   }
@@ -240,6 +234,8 @@ void writeWave() {
   free(lsb_list);
   free(msb_list);
   free(sign_list);
+
+  Serial.println(200);
   
   return;
 }

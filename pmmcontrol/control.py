@@ -132,7 +132,7 @@ class Control(Arduino):
 
         # calibrate sense circuit
         #self.measureSenseResistor()
-        self.measureNullVoltage(1)
+        self.measureNullVoltage(5)
         print("Calibrated sense circuit.")
 
         # load resistor values
@@ -733,7 +733,7 @@ class Control(Arduino):
         vData_read = np.array([])
 
         if full:
-            pins = np.concatenate((self.col_primary_pins, self.row_primary_pins))
+            pins = np.concatenate((self.col_primary_pins[2:], self.row_primary_pins))
             type = 'All'
         else:
             pins = [self.row_primary_pins[0]]
@@ -812,7 +812,7 @@ class Control(Arduino):
         plt.figure(3)
         plt.plot(self.amp_gain * vData_read, cData * 1000, marker='.', linestyle='', label='analogRead() Measurements')
         plt.plot(points, intercept+slope*points, linestyle='--', color='orange', label='Linear Fit: R = {}'.format(str(round(r_value, 4))))
-        plt.xlabel("Voltage [V]")
+        plt.xlabel("Amplified Voltage [V]")
         plt.ylabel('Current [mA]')
         plt.title(type + ' Channel Current Linearity')
         plt.legend(loc='upper left')
@@ -1092,24 +1092,32 @@ class Control(Arduino):
             raise ValueError("Can not reset magnet that has been selected in array mode. Please reselect magnet.")
 
         # set oscillating and exponentially decaying current through (row, column) magnet
-        tt = np.linspace(0, 9, res)
+        tt = np.linspace(0, 12, res)
         max_voltage = self.max_voltage_linear
         voltage_list = np.exp(-tt / 5.0) * np.sin(tt / (3.0 / (2 * pi))) * max_voltage
-        voltage_list = np.append(voltage_list, 0)
+        voltage_list = np.append(voltage_list, 0).tolist()
 
-        # call setCurrent() first to allow updateCurrent()
+        # call setVoltage() first to enable proper switches
         self.setVoltage(voltage_list[0])
         rc_enabled = np.intersect1d(np.array(self.high_pins), np.array(self.rc_pins)).tolist()
         self.writeWave(self.amp_pins, rc_enabled, voltage_list[1:])
 
         return True
 
-    def resetAllMagnet(self):
+    def resetAllMagnets(self, res):
         '''
         Resets the field of each magnet by iterating through rows and columns
         '''
 
-        raise NotImplementedError
+        tt = np.linspace(0, 12, res)
+        max_voltage = self.max_voltage_linear
+        voltage_list = np.exp(-tt / 5.0) * np.sin(tt / (3.0 / (2 * pi))) * max_voltage
+        voltage_list = np.append(voltage_list, 0).tolist()
+
+        # call setVoltage() first to enable proper switches
+        rc_enabled = np.concatenate((self.row_primary_pins, self.col_primary_pins)).tolist()
+
+        self.writeWave(self.amp_pins, rc_enabled, voltage_list)
 
     def findResonances(self, frequency_range):
         '''

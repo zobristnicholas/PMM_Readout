@@ -151,7 +151,12 @@ class Arduino(object):
         self.__sendData(data1)
         return True
 
-    def writeWave(self, amp_pins: list, rc_state: list, v_data: list) -> list:
+    def writeWave(self, amp_pins: list, rc_state: list, v_data: list) -> bool:
+
+        # inital state: off
+        self.writeDAC(0)
+        for pin in rc_state:
+            self.setLow(pin)
 
         self.__sendData('9')
 
@@ -170,8 +175,12 @@ class Arduino(object):
         self.__sendData(wave_size_data[0])
         self.__sendData(wave_size_data[1])
 
+        # s if successfully allocated lists, f if failed
         code = self.__getData()
-        print("CODE: ", code)
+        if code == 's':
+            pass
+        else:
+            raise InterruptedError("Unable to allocated necessary onboard memory.")
 
         # send pins
         # pins must be < 128
@@ -197,6 +206,17 @@ class Arduino(object):
             self.__sendData(data[0])
             self.__sendData(data[1])
             self.__sendData(sign)
+
+        code  = int(self.__getData())
+        if code == 200:
+            print("done!")
+        else:
+            raise Warning("Did not receive success code.")
+
+        # final state: off
+        self.writeDAC(0)
+        for pin in rc_state:
+            self.setLow(pin)
 
         return True
     def readDAC(self):
