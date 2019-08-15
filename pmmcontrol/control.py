@@ -107,7 +107,6 @@ class Control(Arduino):
 
         # state values to be set later
         self.DAC_isPos = None
-        self.DAC_voltage = None
 
         # calibrate vcc reading actual / measured. Use if powered under 5V
         self.vcc_scale = 1
@@ -994,7 +993,6 @@ class Control(Arduino):
         sleep(0.1)
 
         self.DAC_isPos = posDAC # keep track of sign of DAC
-        self.DAC_voltage = set_voltage # keep track of voltage
 
     def updateCurrent(self, current, allowNL=False):
         '''
@@ -1005,7 +1003,7 @@ class Control(Arduino):
         if not hasattr(self, 'state_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if self.DAC_voltage == None:
+        if len(self.high_pins) == 0:
             raise AttributeError("Initial current has not been set. " +
                                  " Run 'setCurrent()' first")
         if not self.state_isPrimary and self.state_isArrayMode:
@@ -1028,7 +1026,7 @@ class Control(Arduino):
         if not hasattr(self, 'state_sign'):
             raise AttributeError("Some attributes have not been set. " +
                                  " Run 'selectMagnet()' first")
-        if self.DAC_voltage == None:
+        if len(self.high_pins) == 0:
             raise AttributeError("Initial voltage has not been set. " +
                                  " Run 'setVoltage()' first")
         if not self.state_isPrimary and self.state_isArrayMode:
@@ -1073,8 +1071,6 @@ class Control(Arduino):
         # set voltage on DAC
         binary = int(np.abs(set_voltage) * (2 ** 16 - 1) / self.readVcc())
         self.writeDAC(binary)
-
-        self.DAC_voltage = set_voltage
 
     def sendWaveform(self):
         raise NotImplementedError
