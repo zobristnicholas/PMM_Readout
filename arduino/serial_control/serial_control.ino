@@ -172,6 +172,12 @@ void writeWave() {
   bool prev_sign = sign_list[0];
 
   // inital sign config
+  unsigned long config_start = millis();
+  Wire.beginTransmission(DAC_ADDRESS);
+  Wire.write(0x1F);
+  Wire.write(0);
+  Wire.write(0);
+  Wire.endTransmission();
   for (int i=0; i<state_size; i++) {digitalWrite(state_list[i], LOW);}
   if (prev_sign == true) {
     digitalWrite(neg_pin, LOW);
@@ -181,6 +187,8 @@ void writeWave() {
     digitalWrite(neg_pin, HIGH);
   }
   for (int i=0; i<state_size; i++) {digitalWrite(state_list[i], HIGH);}
+  unsigned long config_end = millis();
+  unsigned long config_duration = config_end - config_start;
 
   uint8_t data0 = 0;
   uint8_t data1 = 0;
@@ -217,6 +225,9 @@ void writeWave() {
       for (int i=0; i<state_size; i++) {
         digitalWrite(state_list[i], HIGH);
       }
+    } else {
+      // delay by amount of time config takes to even out steps
+      delay(config_duration);
     }
 
     prev_sign = sign_list[i];
