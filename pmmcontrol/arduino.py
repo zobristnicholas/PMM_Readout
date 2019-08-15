@@ -190,6 +190,7 @@ class Arduino(object):
         # convert voltages to binary here
         # check all values before beginning transmission
 
+        print("Sending data...")
         for voltage in v_data:
             value = int(abs(voltage) * (2 ** 16 - 1) / 5)
 
