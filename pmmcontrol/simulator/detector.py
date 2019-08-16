@@ -2,6 +2,7 @@ from pmmcontrol.simulator.hysteresis import Hysteresis
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from scipy.constants import pi
 
 from random import randrange
 
@@ -28,10 +29,10 @@ class Detector():
 
         # scatter base frequencies
         for idx, freq in enumerate(self.baseFrequencies):
-            self.baseFrequencies[idx] = freq + (randrange(-1000, 1000)/1000) * self.f_error
+            self.baseFrequencies[idx] = freq + np.random.normal() * self.f_error
 
-        self.qc_array = (np.random.random(self.nResonators) + 2) * 10000
-        self.qi_array = (np.random.random(self.nResonators)*7 + 8) * 10000
+        self.qc_array = np.random.normal(25000, 5000, self.nResonators)
+        self.qi_array = np.random.normal(115000, 35000, self.nResonators)
 
         self.baseFrequencies = self.baseFrequencies.reshape(self.rows, self.cols)
         self.qc_array = self.qc_array.reshape(self.rows, self.cols)
@@ -60,6 +61,30 @@ class Detector():
         for row in range(self.rows):
             for col in range(self.cols):
                 self.resArray[row, col].setCurrent(self.row_currents[row] + self.col_currents[col])
+
+    def readOut(self, f_start, f_stop):
+
+        step = .01 #MHz
+        f_array = np.arange(f_start, f_stop, step)
+        s_array = []
+
+        phase1, phase2 = np.random.uniform(0, 2*pi), np.random.uniform(0, 2*pi)
+        freq1, freq2 = 2*pi / np.random.normal(50, 10), 2*pi / np.random.normal(50, 10)
+        drift = 0.01 * (np.sin(freq1 * f_array + phase1) + np.sin(freq2 * f_array + phase2))
+
+        for f in f_array:
+            S_f = 1
+            for res in self.resArray.flatten():
+                Qc = res.state['Qc']
+                Qi = res.state['Qi']
+                fr = res.state['Frequency']
+                S_f *= self.S21(f, fr, Qc, Qi) + np.random.normal()*0.001
+            s_array.append(S_f)
+
+        s_array = np.array(s_array) + drift
+        s_array_db = 20*np.log10(s_array)
+
+        return f_array, s_array_db
 
     #
     # testing functions
@@ -153,6 +178,15 @@ class Detector():
 
         #return freqArray
 
+    #
+    # formulas
+    #
+
+    def S21(self, f, fr, Qc, Qi):
+        Q = 1 / ((1/Qc) + (1/Qi))
+        S = 1 - (Q/Qc) / ( 1 + 2j * Q * (f-fr)/(fr) )
+        return abs(S)
+
 
 class Resonator(Hysteresis):
     def __init__(self, baseFreq, Qc, Qi, N=200, satField=25, satMag=0.5,
@@ -175,6 +209,7 @@ class Resonator(Hysteresis):
         self.__deltaFreq = 0
         self.__freq = self.__baseFreq
         self.__Qi = self.__baseQi
+        self.__Qc = self.__baseQc
 
         self.__size = N
 
@@ -224,15 +259,16 @@ class Resonator(Hysteresis):
                      'ResField': self.__B_res,
                      'DeltaFrequency': self.__deltaFreq,
                      'Frequency': self.__freq,
-                     'Qi': self.__Qi}
+                     'Qi': self.__Qi,
+                     'Qc': self.__Qc}
 
         return stateData
 
     @property
     def properties(self):
         propertyData = {'BaseFrequency': self.__baseFreq,
-                        'Qc': self.__baseQc,
-                        'Qi': self.__baseQi,
+                        'BaseQc': self.__baseQc,
+                        'BaseQi': self.__baseQi,
                         'SatField': self.__satField,
                         'SatMagnetization': self.__satMag,
                         'Remanence': self.__remanence,
