@@ -3,6 +3,7 @@ import numpy as np
 from time import time, sleep
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from scipy.signal import find_peaks
 
 class Control(Detector):
 
@@ -159,6 +160,21 @@ class Control(Detector):
                 self.selectMagnet = None
 
         raise NotImplementedError
+
+    def findRes(self):
+
+        f_array, s_array = self.readOut(4800, 5200)
+
+        peaks, properties = find_peaks(-s_array, height=5)
+
+        print("Found " + str(len(peaks)) + " out of " + str(self.rows * self.cols) + " peaks:")
+        print(np.take(f_array, peaks))
+
+        plt.figure()
+        plt.plot(f_array, s_array)
+        plt.plot(np.take(f_array, peaks), np.take(s_array, peaks), linestyle='', marker='x', color='green')
+        plt.show()
+
 
     def resId(self):
         deltaFreq_sat = .0392
