@@ -9,26 +9,36 @@ class Detector():
     def __init__(self, rows=9, cols=10):
         self.rows = rows
         self.cols = cols
+        self.nResonators = self.rows * self.cols
 
+        # for use in basic feedline measurement
         self.freqDistinctionThreshold = 0.01
 
         self.row_currents = np.zeros(rows)
         self.col_currents = np.zeros(cols)
 
         # arbitrary matrix of evenly spaced frequencies
-        self.fstart = 2 #MHz
-        self.fstop = 5 #MHz
-        self.baseFrequencies = np.linspace(self.fstart, self.fstop, self.rows*self.cols)
+        self.f_center= 5000 #MHz
+        self.f_spacing = 2 #MHz
+        self.f_width = int(self.nResonators / 2) * self.f_spacing
+        self.f_error = 40 #Mhz
+
+        # space base frequencies
+        self.baseFrequencies = np.linspace(self.f_center - self.f_width, self.f_center + self.f_width, self.nResonators)
 
         # scatter base frequencies
         for idx, freq in enumerate(self.baseFrequencies):
-            self.baseFrequencies[idx] = freq + (randrange(-1000, 1000)/1000) * 3 * ((self.fstop - self.fstart) /
-                                                    (self.rows*self.cols -1))
+            self.baseFrequencies[idx] = freq + (randrange(-1000, 1000)/1000) * self.f_error
+
+        self.qc_array = (np.random.random(self.nResonators) + 2) * 10000
+        self.qi_array = (np.random.random(self.nResonators)*7 + 8) * 10000
 
         self.baseFrequencies = self.baseFrequencies.reshape(self.rows, self.cols)
+        self.qc_array = self.qc_array.reshape(self.rows, self.cols)
+        self.qi_array = self.qi_array.reshape(self.rows, self.cols)
 
         self.resArray = np.empty((self.rows, self.cols), dtype=object)
-        self.resArray[:,:] = np.vectorize(Resonator)(self.baseFrequencies)
+        self.resArray[:,:] = np.vectorize(Resonator)(self.baseFrequencies, self.qc_array, self.qi_array)
 
     #
     # controller outputs
@@ -145,10 +155,12 @@ class Detector():
 
 
 class Resonator(Hysteresis):
-    def __init__(self, baseFreq, N=200, satField=25, satMag=0.5,
+    def __init__(self, baseFreq, Qc, Qi, N=200, satField=25, satMag=0.5,
                  remanence=0, coercivity=20):
 
         # Resonator properties
+        self.__baseQc = Qc
+        self.__baseQi = Qi
         self.__baseFreq = baseFreq
         self.__satMag = satMag
         self.__coercivity = coercivity
@@ -162,6 +174,7 @@ class Resonator(Hysteresis):
         self.__B_res = 0
         self.__deltaFreq = 0
         self.__freq = self.__baseFreq
+        self.__Qi = self.__baseQi
 
         self.__size = N
 
@@ -210,17 +223,20 @@ class Resonator(Hysteresis):
                      'Magnetization': self.__mag,
                      'ResField': self.__B_res,
                      'DeltaFrequency': self.__deltaFreq,
-                     'Frequency': self.__freq}
+                     'Frequency': self.__freq,
+                     'Qi': self.__Qi}
 
         return stateData
 
     @property
     def properties(self):
         propertyData = {'BaseFrequency': self.__baseFreq,
-                      'SatField': self.__satField,
-                      'SatMagnetization': self.__satMag,
-                      'Remanence': self.__remanence,
-                      'Coercivity': self.__coercivity}
+                        'Qc': self.__baseQc,
+                        'Qi': self.__baseQi,
+                        'SatField': self.__satField,
+                        'SatMagnetization': self.__satMag,
+                        'Remanence': self.__remanence,
+                        'Coercivity': self.__coercivity}
 
         return propertyData
 
