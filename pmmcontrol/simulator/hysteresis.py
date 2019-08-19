@@ -1,8 +1,10 @@
 import numpy as np
+np.set_printoptions(linewidth=320)
 import matplotlib.pyplot as plt
+from scipy.ndimage.filters import gaussian_filter
 
 class Hysteresis():
-    def __init__(self, xSaturation, ySaturation, xCoercivity, yRemanence=0, N=10, xParam='', yParam=''):
+    def __init__(self, xSaturation=1, ySaturation=1, xCoercivity=0.5, yRemanence=0.5, N=5000, xParam='', yParam=''):
 
         if not isinstance(N, int):
             raise ValueError("Matrix size must be an integer value")
@@ -13,8 +15,8 @@ class Hysteresis():
         if not ySaturation >= yRemanence:
             raise ValueError("The y-intercept (remanence) must be lower than the ySaturation value")
 
-        if not xSaturation > xCoercivity:
-            raise ValueError("The x-intercept (coercitivity) must be lower than the xSaturation value")
+        if not xSaturation > xCoercivity/2:
+            raise ValueError("The x-intercept (coercitivity) must be lower than half of the xSaturation value")
 
         # store size of matrix
         self.__size = N
@@ -35,21 +37,25 @@ class Hysteresis():
         self.__relay = np.zeros((N,N))
 
         # matrix of weights to be applied to each relay
-        self.__weights = np.zeros((N,N))
+        self.__weights_rect = np.zeros((N,N))
         # simple weight fill
-        self.__simpleWeightFill()
-        #
-        # OR
-        #
+        self.__rectWeightFill(self.__weights_rect)
+
+
         # matrix of weights to be applied to each relay
-        #self.__weights = np.ones((N,N))
+        self.__weights_smooth = np.ones((N,N))
         # fill the weights matrix to adjust behavior of hysteresis
-        #self.__diagFill(self.__weights)
+        self.__diagFill(self.__weights_smooth)
         # scale weight matrix according to input parameters
         #self.__weightParamScale()
         # OR
-        #self.__weights = self.__weights * (self.__ySaturation /
-        #                                   self.__sumHalf(self.__weights, np.ones((N,N))))
+        self.__weights_smooth = self.__weights_smooth * (self.__ySaturation /
+                                           self.__sumHalf(self.__weights_smooth, np.ones((N,N))))
+
+        self.__weights = self.__weights_rect
+
+        self.__weights = self.__weights * (self.__ySaturation /
+                                                         self.__sumHalf(self.__weights, np.ones((N, N))))
 
         # scaling of plot window
         self.__yMax = self.__sumHalf(self.__weights, np.ones((N,N)))
@@ -153,16 +159,22 @@ class Hysteresis():
 
         return True
 
-    def __simpleWeightFill(self):
+    def __rectWeightFill(self, mat):
         width = int(self.__xCoercitivity * self.__xScale) * 2
         alpha2 = int(self.__xSaturation * self.__xScale)
         alpha1 = width - alpha2
         ms = self.__ySaturation
 
+        val = ms / (alpha2 - alpha1)
+
         for alpha in range(alpha1, alpha2):
             for beta in range(-self.__size//2, self.__size//2 + 1):
                 if (alpha - beta - width == 0):
-                    self.__weights[self.__size//2 - alpha - 1, beta + self.__size//2] = ms / (alpha2 - alpha1)
+                    mat[self.__size//2 - alpha - 1, beta + self.__size//2] = val
+
+        #blur
+
+        mat[:,:] = gaussian_filter(mat, sigma = val * self.__size*np.sqrt(self.__size), truncate=1)
 
 
     def __weightParamScale(self):
@@ -254,8 +266,10 @@ class Hysteresis():
 
     @property
     def weights(self):
-        self.__printHalf(self.__weights)
+        #self.__printHalf(self.__weights)
+        return np.matrix(self.__weights)
 
     @property
     def relays(self):
-        self.__printHalf(self.__relay)
+        #self.__printHalf(self.__relay)
+        return np.matrix(self.__relay)
