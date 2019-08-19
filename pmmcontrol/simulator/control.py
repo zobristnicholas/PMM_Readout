@@ -163,7 +163,7 @@ class Control(Detector):
 
     def findRes(self):
 
-        f_array, s_array = self.readOut(4800, 5200)
+        f_array, s_array = self.readOut(4925, 5075)
 
         peaks, properties = find_peaks(-s_array, height=5)
 
@@ -173,6 +173,8 @@ class Control(Detector):
         plt.figure()
         plt.plot(f_array, s_array)
         plt.plot(np.take(f_array, peaks), np.take(s_array, peaks), linestyle='', marker='x', color='green')
+        plt.xlabel("Frequency [MHz]")
+        plt.ylabel("|S21| [Db]")
         plt.show()
 
 
