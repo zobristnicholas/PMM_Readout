@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.ndimage.filters import gaussian_filter
 
 class Hysteresis():
-    def __init__(self, xSaturation=1, ySaturation=1, xCoercivity=0.5, yRemanence=0.5, N=5000, xParam='', yParam=''):
+    def __init__(self, xSaturation=1, ySaturation=1, xCoercivity=0.9, yRemanence=0.5, N=100, xParam='', yParam=''):
 
         if not isinstance(N, int):
             raise ValueError("Matrix size must be an integer value")
@@ -15,8 +15,13 @@ class Hysteresis():
         if not ySaturation >= yRemanence:
             raise ValueError("The y-intercept (remanence) must be lower than the ySaturation value")
 
-        if not xSaturation > xCoercivity/2:
-            raise ValueError("The x-intercept (coercitivity) must be lower than half of the xSaturation value")
+        if not xSaturation > xCoercivity:
+            raise ValueError("The x-intercept (coercivity) must be lower than the xSaturation value")
+
+        if not xCoercivity >= xSaturation/2:
+            print(xCoercivity)
+            print(xSaturation)
+            raise ValueError("The x-intercept (coercivity) must be greater than or equal to half of the xSaturation value")
 
         # store size of matrix
         self.__size = N
@@ -174,7 +179,7 @@ class Hysteresis():
 
         #blur
 
-        mat[:,:] = gaussian_filter(mat, sigma = val * self.__size*np.sqrt(self.__size), truncate=1)
+        mat[:,:] = gaussian_filter(mat, sigma = 20)
 
 
     def __weightParamScale(self):
