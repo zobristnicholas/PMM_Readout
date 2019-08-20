@@ -392,6 +392,59 @@ class Control(Detector):
         print("Average Time #1: ", tSum1/trials)
         print("Average Time #2: ", tSum2/trials)
 
+    def hystTest(self):
+        xsat_arr = np.linspace(1, 10, 10)
+        ysat = 1
+
+        yrem_arr = []
+
+        for s in xsat_arr:
+            hyst = Hysteresis(s, ysat, s/2)
+            hyst.setX(s)
+            yrem = hyst.setX(0)
+            hyst.plot()
+            yrem_arr.append(yrem)
+
+        yrem_arr = np.array(yrem_arr)
+        rem_ratio_arr = yrem_arr / ysat
+
+        print(rem_ratio_arr)
+
+        plt.figure()
+        plt.plot(xsat_arr, rem_ratio_arr)
+        plt.title("Remanence Ratio vs. Saturation X-Value")
+        plt.show()
+
+
+        xcoerc_arr = np.linspace(0.5, 0.9, 10)
+        ysat = 1
+        xsat = 1
+
+        yrem_arr = []
+
+        for c in xcoerc_arr:
+            hyst = Hysteresis(xsat, ysat, c)
+            hyst.setX(xsat)
+            yrem = hyst.setX(0)
+            hyst.plot()
+            yrem_arr.append(yrem)
+
+        yrem_arr = np.array(yrem_arr)
+        rem_ratio_arr = yrem_arr / ysat
+        coer_ratio_arr = xcoerc_arr / xsat
+
+        print(rem_ratio_arr)
+
+        plt.figure()
+        plt.plot(xcoerc_arr, rem_ratio_arr)
+        plt.title("Remanence Ratio vs. Coercivity X-Value")
+        plt.show()
+
+        plt.figure()
+        plt.plot(coer_ratio_arr, rem_ratio_arr)
+        plt.title("Remanence Ratio vs. Coercivity Ratio")
+        plt.plot()
+
     def __currentToVoltage(self, current):
         '''
         Converts the requested current into a voltage required to be output by the DAC.
