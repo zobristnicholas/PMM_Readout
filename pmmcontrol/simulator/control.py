@@ -4,6 +4,9 @@ from time import time, sleep
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from scipy.signal import find_peaks
+from scipy.interpolate import interp1d
+
+from pmmcontrol.simulator.hysteresis import Hysteresis
 
 class Control(Detector):
 
@@ -153,11 +156,12 @@ class Control(Detector):
 
         return True
 
+    #TODO: resetAllMagnet()
     def resetAllMagnet(self):
 
         for row in range(self.rows):
             for col in range(self.columns):
-                self.selectMagnet = None
+                pass
 
         raise NotImplementedError
 
@@ -177,6 +181,46 @@ class Control(Detector):
         plt.ylabel("|S21| [Db]")
         plt.show()
 
+    def readoutDifference(self):
+
+        f_lower = 4925
+        f_upper = 5075
+
+        freqList = np.ones((self.rows, self.columns), dtype='float') * -1
+
+        for row in range(self.rows):
+            for col in range(self.columns):
+                f_array_1, s_array_1 = self.readOut(f_lower, f_upper)
+                read_1 = interp1d(f_array_1, s_array_1, bounds_error=False, fill_value=(f_array_1[0], f_array_1[-1]))
+
+                self.selectMagnet(row, col, True)
+                self.setCurrent(15)
+
+                f_array_2, s_array_2 = self.readOut(f_lower, f_upper)
+                read_2 = interp1d(f_array_2, s_array_2, bounds_error=False, fill_value=(f_array_2[0], f_array_2[-1]))
+
+                self.resetMagnetRect()
+
+                points = np.linspace(f_lower, f_upper, 1000)
+                difference = np.vectorize(read_1)(points) - np.vectorize(read_2)(points)
+
+                peaks, properties = find_peaks(-difference, height=0.2)
+                max_pos = np.argmax(properties["peak_heights"])
+                freq_pos = peaks[max_pos]
+
+                freqList[row, col] = points[freq_pos]
+
+                plt.figure()
+                plt.plot(points, difference)
+                plt.plot(points[freq_pos], difference[freq_pos], linestyle='', marker='x', color='green')
+                plt.show()
+
+        print(freqList)
+
+        sortIdx = np.argsort(freqList)
+        freqIdx = np.argsort(sortIdx)
+
+        return freqIdx
 
     def resId(self):
         deltaFreq_sat = .0392
@@ -342,7 +386,7 @@ class Control(Detector):
     def testId(self):
         pass1, pass2 = 0, 0
         tSum1, tSum2 = 0, 0
-        trials = 5
+        trials = 1
 
         for n in range(trials):
             print("Trial #", n+1)
@@ -361,10 +405,11 @@ class Control(Detector):
             print()
 
             start1 = time()
-            m1 = self.resIdBasic()
+            m1 = self.readoutDifference()
             end1 = time()
             elapsed1 = end1-start1
 
+            print(m1)
             if np.array_equal(realOrder, m1):
                 print("Good! \n")
                 pass1 = pass1 + 1
@@ -376,6 +421,7 @@ class Control(Detector):
             end2 = time()
             elapsed2 = end2-start2
 
+            print(m2)
             if np.array_equal(realOrder, m2):
                 print("Good! \n")
                 pass2 = pass2 + 1
